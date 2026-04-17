@@ -22,3 +22,5 @@ dependencies:
   - fiona
   - gdal
   - ipykernel
+  - earthengine-api
+  - geemap
