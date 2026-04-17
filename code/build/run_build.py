@@ -55,8 +55,11 @@ LOCAL_NOTEBOOKS = [
     "kgclimzones_ethnologue.ipynb",
     "protectedland_ethnologue.ipynb",
     "forestloss_ethnologue.ipynb",
+    "forestloss_ethnologue_fixed.ipynb",
+    "treecover_modis_ethnologue.ipynb",
     "nl_ethnologue.ipynb",
     "waterchange_ethnologue.ipynb",
+    "ruggedness_ethnologue.ipynb",
 ]
 
 
