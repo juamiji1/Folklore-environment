@@ -92,7 +92,7 @@ save `TREESMODIS', replace
 import delimited "${maps}/raw\DEM\ethnologue_ruggedness.csv", clear
 
 tempfile TRI
-save `TRI', replace 
+save `TRI', replace
 
 * Merging the satellite imagery with folklore
 use "${data}/interim\Motifs_EA_WESEE_Ethnologue_humanvsnature_all.dta", clear
@@ -108,20 +108,27 @@ merge 1:1 id using `HII', keep(1 3) nogen
 merge 1:1 id using `GHG', keep(1 3) nogen 
 merge m:1 id using `CLIMZ', keep(1 3) nogen 
 merge 1:1 id using `TREESMODIS', keep(1 3) nogen 
-merge m:1 id using `TRI', keep(1 3) nogen 
+merge m:1 id using `TRI', keep(1 3) nogen
 
-merge m:1 c1 using `ISO3', keep(1 3) nogen 
+merge m:1 c1 using `ISO3', keep(1 3) nogen
 
 * Creating vars of interest 
 gen sh_protected=protected_km2*100/area_km2
 gen sh_treeloss=treeloss_km2*100/treecover_km2
 gen sh_treecover=treecover_km2*100/area_km2
+gen sh_treecover_modis=treecover_modis_km2*100/area_km2
 
-replace sh_protected=. if sh_protected>100 & sh_protected!=.
-replace sh_treeloss=. if sh_treeloss>100 & sh_treeloss!=.
-replace sh_treecover=. if sh_treecover>100 & sh_treecover!=.
+gen sh_treeloss_v2=treeloss_km2*100/area_km2
+
+replace sh_protected=100 if sh_protected>100 & sh_protected!=.
+replace sh_treeloss=100 if sh_treeloss>100 & sh_treeloss!=.
+replace sh_treecover=100 if sh_treecover>100 & sh_treecover!=.
+replace sh_treecover_modis=100 if sh_treecover_modis>100 & sh_treecover_modis!=.
+
+replace sh_treeloss_v2=100 if sh_treeloss_v2>100 & sh_treeloss_v2!=.
 
 replace sh_treeloss=0 if sh_treeloss==.
+replace sh_treeloss_v2=0 if sh_treeloss_v2==.
 
 gen tot_water=permwater_km2+losswater_km2
 gen sh_losswater=losswater_km2*100/permwater_km2
@@ -151,6 +158,15 @@ la var sh_nat_socl_atl `" "Share of motifs with nature-only" "subject or object"
 la var sh_nat_scl_atl `" "Share of motifs with a" "nature-only subject" "'
 la var sh_nat_ocl_atl `" "Share of motifs with a" "nature-only object" "'
 
+*Dominant climatic zone (1–30): index of share_gc_* with the highest share
+egen max_gc_share = rowmax(share_gc_1-share_gc_30)
+gen dom_climzone = .
+forvalues k = 1/30 {
+	replace dom_climzone = `k' if share_gc_`k' == max_gc_share & dom_climzone == .
+}
+drop max_gc_share
+la var dom_climzone "Dominant Köppen-Geiger zone (argmax of share_gc_1..30; ties → lowest index)"
+
 *-------------------------------------------------------------------------------
 * Keep only variables needed for the replication
 *-------------------------------------------------------------------------------
@@ -160,22 +176,22 @@ local climvars `r(varlist)'
 
 * Keep essential variables for replication
 keep id c1 isocode country_code isocode_num eafolk_id ///
-     bii sh_treecover changewater hii ///
+     bii sh_treecover* changewater hii ///
      sh_nat_socl_atl sh_nat_scl_atl sh_nat_ocl_atl ///
-     `climvars' ///
-     area_km2
+     `climvars' dom_climzone tri_mean elev_mean ///
+     area_km2 sh_protected sh_treeloss*
 
 * Order variables
 order id c1 isocode country_code isocode_num eafolk_id ///
-      bii sh_treecover changewater hii ///
+      bii sh_treecover* changewater hii ///
       sh_nat_socl_atl sh_nat_scl_atl sh_nat_ocl_atl
 
 *-------------------------------------------------------------------------------
 * Save the dataset
 *-------------------------------------------------------------------------------
 compress
-save "${data}/final/data_remote_sensing.dta", replace
+save "${data}/final/folklore_envmeasures.dta", replace
 
-di _n "Dataset created successfully: data_natureonly_replication.dta"
+di _n "Dataset created successfully: folklore_envmeasures.dta"
 di "Number of observations: " _N
 describe, short

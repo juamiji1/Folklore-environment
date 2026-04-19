@@ -60,6 +60,7 @@ LOCAL_NOTEBOOKS = [
     "nl_ethnologue.ipynb",
     "waterchange_ethnologue.ipynb",
     "ruggedness_ethnologue.ipynb",
+    "treecover_modis_ethnologue.ipynb"
 ]
 
 
