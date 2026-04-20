@@ -94,6 +94,11 @@ import delimited "${maps}/raw\DEM\ethnologue_ruggedness.csv", clear
 tempfile TRI
 save `TRI', replace
 
+import delimited "${maps}/raw\Geography\ethnologue_centroids.csv", clear
+
+tempfile CENT
+save `CENT', replace
+
 * Merging the satellite imagery with folklore
 use "${data}/interim\Motifs_EA_WESEE_Ethnologue_humanvsnature_all.dta", clear
 
@@ -109,6 +114,7 @@ merge 1:1 id using `GHG', keep(1 3) nogen
 merge m:1 id using `CLIMZ', keep(1 3) nogen 
 merge 1:1 id using `TREESMODIS', keep(1 3) nogen 
 merge m:1 id using `TRI', keep(1 3) nogen
+merge m:1 id using `CENT', keep(1 3) nogen
 
 merge m:1 c1 using `ISO3', keep(1 3) nogen
 
@@ -178,7 +184,7 @@ local climvars `r(varlist)'
 keep id c1 isocode country_code isocode_num eafolk_id ///
      bii sh_treecover* changewater hii ///
      sh_nat_socl_atl sh_nat_scl_atl sh_nat_ocl_atl ///
-     `climvars' dom_climzone tri_mean elev_mean ///
+     `climvars' dom_climzone tri_mean elev_mean lat lon ///
      area_km2 sh_protected sh_treeloss*
 
 * Order variables
