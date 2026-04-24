@@ -1,19 +1,10 @@
 /*------------------------------------------------------------------------------
 PROJECT: 
 AUTHOR: JMJR
-TOPIC: Regressions per outcome with Nature Exclusive Measures (REPLICATION)
-       — table style aligned with regressions_envmeasures_aes_natureonly_NEW.do
+TOPIC: 
 DATE:
 
-NOTES: Same per-outcome design as regressions_envmeasures_peroutcome_natureonly.do
-       (one table per outcome, treatment alternates between X1_int and X2_int),
-       but with the table modifications adopted from the AES_NEW file:
-         * 12 columns from a single forval c=1/6 loop (k = c + 6 for the
-           X2_int half), no separate X3e slot
-         * X1..X6 spec ladder (X1: country FE → X6: + sh_protected)
-         * Footer rows added for Mean of dep. var., Standard deviation of
-           dep. var., and Ethnic-folklore clusters
-         * ${IF} and ${CL} globals to slim the regression call
+NOTES: 
 ------------------------------------------------------------------------------*/
 
 clear all
@@ -90,13 +81,17 @@ la var sh_permwater_base   "Permanent Surface Water"
 la var sh_seasonwater_base "Seasonal Surface Water"
 
 *-------------------------------------------------------------------------------
-* Estimations + tables — one per outcome, 12 columns each
-*   Cols 1..6  : (X1..X6) x X1_int
-*   Cols 7..12 : (X1..X6) x X2_int  (k = c + 6, same controls as col c)
+* MODIS vs LANDSAT (plot)
 *-------------------------------------------------------------------------------
-*gl depvars "bii sh_treecover sh_treecover_modis sh_treeloss changewater changewater_abs sh_permwater_base sh_seasonwater_base sh_permwater_base_excl_res sh_seasonwater_base_excl_res changewater_excl_res changewater_abs_excl_res sh_water_base"
+binscatter sh_treecover sh_treecover_modis, nq(100) ///
+	xtitle("Tree Cover Share (MODIS, %)") ///
+	ytitle("Tree Cover Share (Hansen, %)")
+gr export "${plots}\binscatter_modis_landsat.pdf", replace as(pdf)
 
-gl depvars "bii sh_treecover sh_seasonwater_base"
+*-------------------------------------------------------------------------------
+* MODIS vs LANDSAT (estimation)
+*-------------------------------------------------------------------------------
+gl depvars "sh_treecover sh_treecover_modis"
 
 foreach yvar of global depvars {
 
@@ -117,7 +112,7 @@ foreach yvar of global depvars {
 		egen std_`yvar'= std(`yvar') if ${IF}
 		
 		* Estimation
-		eststo c`c': reg std_`yvar' ${X`c'} ${X1_int} if ${IF}, vce(cluster ${CL}) 
+		eststo c`c': reg std_`yvar' ${X`c'} ${X1_int} if ${IF} & `yvar'>0, vce(cluster ${CL}) 
 		gl n`c'  = `e(N)'
 		
 		distinct eafolk_id if e(sample)==1
@@ -135,7 +130,7 @@ foreach yvar of global depvars {
 		egen std_`yvar'= std(`yvar') if ${IF}
 		
 		* Estimation
-		eststo c`k': reg std_`yvar' ${X`c'} ${X2_int} if ${IF}, vce(cluster ${CL}) 
+		eststo c`k': reg std_`yvar' ${X`c'} ${X2_int} if ${IF} & `yvar'>0, vce(cluster ${CL}) 
 		gl n`k'  = `e(N)'
 		
 		distinct eafolk_id if e(sample)==1
@@ -150,7 +145,7 @@ foreach yvar of global depvars {
 	* Export
 	*-------------------------------------------------------------------------------
 	esttab c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 ///
-		using "${tables}/Table_peroutcome_`yvar'.tex", ///
+		using "${tables}/Table_peroutcome_`yvar'_comparison.tex", ///
 		keep(${X1_int} ${X2_int}) ///
 		coeflabels( ///
 			sh_nat_socl_atl "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}" ///
@@ -184,3 +179,4 @@ di _n "Per-outcome tables completed!"
 
 
 *END
+

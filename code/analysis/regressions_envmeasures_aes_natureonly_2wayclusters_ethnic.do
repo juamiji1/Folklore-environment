@@ -1,23 +1,17 @@
 /*------------------------------------------------------------------------------
 PROJECT: 
 AUTHOR: JMJR
-TOPIC: Regressions with Nature Exclusive Measures (REPLICATION) — aes_z variant
+TOPIC: Regressions with Nature Exclusive Measures (REPLICATION) — ZAES with 2-way clusters
 DATE:
 
-NOTES: Mirrors regressions_envmeasures_aes_natureonly_replication.do but the
-       three swindex robustness blocks are replaced with an "aes_z" outcome
-       defined as the rowmean of in-sample standardized
-       {bii, sh_treecover, changewater}.
+NOTES: Mirrors regressions_envmeasures_aes_natureonly_NEW.do but the ZAES
+       section uses two-way clustering on (eafolk_id, country_code) via
+       reghdfe instead of one-way (eafolk_id) via reg.
 
-       Robustness variants for the aes_z outcome:
-         (1) reghdfe + 1-way cluster (eafolk_id)
-         (2) reghdfe + 2-way cluster (eafolk_id, country_code)
-         (3) acreg   + Conley spatial SE, 500 km cutoff
+       The AES (avg_effect) block is omitted because avg_effect does not
+       support multi-way clustering. Only the ZAES outcome is reported here.
 
-       Per-spec sample is identified via missing_values==0 over outcomes +
-       treatment + per-spec controls. Standardization happens INSIDE
-       preserve/restore so the column-specific sample doesn't leak across
-       specifications.
+       Requires: ssc install reghdfe ; ssc install ftools
 ------------------------------------------------------------------------------*/
 
 clear all
@@ -47,7 +41,7 @@ grstyle color major_grid dimgray
 
 
 *===============================================================================
-* 1. Preparing everything for estimating AES and ZAES
+* 1. Preparing everything for estimating ZAES
 *
 *===============================================================================
 use "${data}/final/folklore_envmeasures.dta", clear
@@ -80,7 +74,7 @@ gl X5 "hii elev_mean tri_mean ${domclimezone} ${countrycodes}"
 gl X6 "hii elev_mean tri_mean sh_protected ${domclimezone} ${countrycodes}"
 
 gl IF "missing_values==0"
-gl CL "eafolk_id"
+gl CL "eafolk_id country_code"
 
 *-------------------------------------------------------------------------------
 * Labels for the table title
@@ -96,171 +90,71 @@ la var sh_seasonwater_base "Seasonal Surface Water"
 
 
 *===============================================================================
-* AES results — one outcome, 12 columns
+* Z-AES results — one outcome, 12 columns, 2-way clustered SEs
 *
 *===============================================================================
-gl depvars "bii sh_treecover sh_seasonwater_base"
-
-*-------------------------------------------------------------------------------
-* Estimations
-*-------------------------------------------------------------------------------
-eststo clear 
-
-forval c=1/6{
-
-	local k=`c'+6
-	
-	* First specification: avg_effect ~ sh_nat_socl_atl
-	cap drop missing_values
-	egen missing_values = rowmiss(${depvars} ${X`c'} ${X1_int})
-
-	eststo aes`c': avg_effect ${depvars} if ${IF}, x(${X`c'} ${X1_int}) effectvar(${X1_int}) controltest(${IF}) cl(${CL})
-	gl n`c' = "`e(N)'"
-
-	distinct eafolk_id if e(sample)==1
-	gl cl`c'="`r(ndistinct)'"
-
-	* Pooled mean & SD across standardized outcomes (same sample as the regression)
-	foreach y of global depvars {
-		cap drop _std_`y'
-		qui egen _std_`y' = std(`y') if missing_values==0
-	}
-	cap drop _pooled
-	qui egen _pooled = rowmean(_std_*)
-	qui sum _pooled
-	gl my`c' = string(r(mean), "%9.3f")
-	gl sd`c'    = string(r(sd),   "%9.3f")
-	drop _std_* _pooled
-
-	* Second specification: avg_effect ~ sh_nat_scl_atl + sh_nat_ocl_atl
-	cap drop missing_values
-	egen missing_values = rowmiss(${depvars} ${X`c'} ${X2_int})
-
-	eststo aes`k': avg_effect ${depvars} if ${IF}, x(${X`c'} ${X2_int}) effectvar(${X2_int}) controltest( ${IF}) cl(${CL})
-	gl n`k' = "`e(N)'"
-
-	distinct eafolk_id if e(sample)==1
-	gl cl`k'="`r(ndistinct)'"
-
-	* Pooled mean & SD across standardized outcomes (same sample as the regression)
-	foreach y of global depvars {
-		cap drop _std_`y'
-		qui egen _std_`y' = std(`y') if missing_values==0
-	}
-	cap drop _pooled
-	qui egen _pooled = rowmean(_std_*)
-	qui sum _pooled
-	gl my`k' = string(r(mean), "%9.3f")
-	gl sd`k'    = string(r(sd),   "%9.3f")
-	drop _std_* _pooled
-
-}
-
-*-------------------------------------------------------------------------------
-* Table
-*-------------------------------------------------------------------------------
-*Exporting results dummy
-esttab aes1 aes2 aes3 aes4 aes5 aes6 aes7 aes8 aes9 aes10 aes11 aes12 ///
-	using "${tables}/Table_folklore_aes_natureonly.tex", ///
-	keep(ae_sh_nat_socl_atl ae_sh_nat_scl_atl ae_sh_nat_ocl_atl) ///
-	coeflabels( ///
-		ae_sh_nat_socl_atl "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}" ///
-		ae_sh_nat_scl_atl  "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject in a triplet}}" ///
-		ae_sh_nat_ocl_atl  "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}object in a triplet}}") ///
-	se nocons star(* 0.10 ** 0.05 *** 0.01) ///
-	label nolines fragment nomtitle nonumbers noobs nodep collabels(none) ///
-	booktabs b(3) replace ///
-	prehead(`"\begin{tabular}[t]{l*{12}{c}}"' ///
-			`"\toprule"' ///
-			`" & \multicolumn{12}{c}{Environmental Measures (AES) - Nature Exclusive} \\"' ///
-			`"\cmidrule(lr){2-13}"' ///
-			`" & (1) & (2) & (3) & (4) & (5) & (6) & (7) & (8) & (9) & (10) & (11) & (12) \\"' ///
-			`"\midrule"') ///
-	postfoot(`" & & & & & & & & & & & & \\"' ///
-			 `" HII control               & No  & Yes & Yes & Yes & Yes & Yes & No  & Yes & Yes & Yes & Yes & Yes \\"' ///
-			 `" Climatic-zone FE          & No  & No  & Yes & Yes & Yes & Yes & No  & No  & Yes & Yes & Yes & Yes \\"' ///
-			 `" Elevation                 & No  & No  & No  & Yes & Yes & Yes & No  & No  & No  & Yes & Yes & Yes \\"' ///
-			 `" Ruggedness                & No  & No  & No  & No  & Yes & Yes & No  & No  & No  & No  & Yes & Yes \\"' ///
-			 `" Share of protected land   & No  & No  & No  & No  & No  & Yes & No  & No  & No  & No  & No  & Yes \\"' ///
-			 `" Country fixed effects     & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes \\"' ///
-			 `" & & & & & & & & & & & & \\"' ///
-			 `"Observations & ${n1} & ${n2} & ${n3} & ${n4} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n10} & ${n11} & ${n12} \\"' ///
-			 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my4} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my10} & ${my11} & ${my12} \\"' ///
-			 `"Ethnic-folklore clusters & ${cl1} & ${cl2} & ${cl3} & ${cl4} & ${cl5} & ${cl6} & ${cl7} & ${cl8} & ${cl9} & ${cl10} & ${cl11} & ${cl12} \\"' ///
-			 `"\bottomrule"' ///
-			 `"\end{tabular}"')
-
-di _n "Replication completed successfully!"
-
-
-*===============================================================================
-* Z-AES results — one outcome, 12 columns
-*
-*===============================================================================
+gl depvars  "bii sh_treecover sh_seasonwater_base"
 gl zdepvars "std_bii std_sh_treecover std_sh_seasonwater_base"
 
 *-------------------------------------------------------------------------------
 * Estimations
 *-------------------------------------------------------------------------------
-eststo clear 
+eststo clear
 
 forval c=1/6{
 
 	local k=`c'+6
-	
-	* First specification: avg_effect ~ sh_nat_socl_atl
+
+	* First specification: zaes ~ sh_nat_socl_atl
 	cap drop missing_values
 	egen missing_values = rowmiss(${depvars} ${X`c'} ${X1_int})
-	
+
 	foreach yvar of global depvars {
 		cap drop std_`yvar'
 		egen std_`yvar'= std(`yvar') if ${IF}
 	}
-	
+
 	cap drop aes_z
 	egen aes_z = rowmean(${zdepvars}) if ${IF}
-	
-	* Estimation of 1st spec.
-	eststo zaes`c': reg aes_z ${X`c'} ${X1_int} if ${IF}, vce(cluster ${CL}) 
-	gl n`c' = "`e(N)'"
 
-	distinct eafolk_id if e(sample)==1
-	gl cl`c'="`r(ndistinct)'"
-	
+	* Estimation of 1st spec — reghdfe with 2-way clustered SEs
+	eststo zaes`c': reghdfe aes_z ${X`c'} ${X1_int} if ${IF}, noabsorb vce(cluster ${CL}) keepsing
+	gl n`c'   = "`e(N)'"
+	gl clf`c' = "`e(N_clust1)'"
+	gl clc`c' = "`e(N_clust2)'"
+
 	summ aes_z if e(sample)==1
-	gl my`c'= "`=string(round(r(mean), .001), "%9.3f")'"
-	gl sd`c'= "`=string(round(r(sd),   .001), "%9.3f")'"
+	gl my`c' = "`=string(round(r(mean), .001), "%9.3f")'"
+	gl sd`c' = "`=string(round(r(sd),   .001), "%9.3f")'"
 
-	* Second specification: avg_effect ~ sh_nat_scl_atl + sh_nat_ocl_atl
+	* Second specification: zaes ~ sh_nat_scl_atl + sh_nat_ocl_atl
 	cap drop missing_values
 	egen missing_values = rowmiss(${depvars} ${X`c'} ${X2_int})
-	
+
 	foreach yvar of global depvars {
 		cap drop std_`yvar'
 		egen std_`yvar'= std(`yvar') if ${IF}
 	}
-	
+
 	cap drop aes_z
 	egen aes_z = rowmean(${zdepvars}) if ${IF}
-	
-	* Estimation of 2nd spec.
-	eststo zaes`k': reg aes_z ${X`c'} ${X2_int} if ${IF}, vce(cluster ${CL}) 
-	gl n`k' = "`e(N)'"
 
-	distinct eafolk_id if e(sample)==1
-	gl cl`k'="`r(ndistinct)'"
-	
+	* Estimation of 2nd spec — reghdfe with 2-way clustered SEs
+	eststo zaes`k': reghdfe aes_z ${X`c'} ${X2_int} if ${IF}, noabsorb vce(cluster ${CL}) keepsing
+	gl n`k'   = "`e(N)'"
+	gl clf`k' = "`e(N_clust1)'"
+	gl clc`k' = "`e(N_clust2)'"
+
 	summ aes_z if e(sample)==1
-	gl my`k'= string(r(mean), "%9.3f")
-	gl sd`k'= string(r(sd), "%9.3f")
+	gl my`k' = "`=string(round(r(mean), .001), "%9.3f")'"
+	gl sd`k' = "`=string(round(r(sd),   .001), "%9.3f")'"
 }
 
 *-------------------------------------------------------------------------------
 * Table
 *-------------------------------------------------------------------------------
-*Exporting results dummy
 esttab zaes1 zaes2 zaes3 zaes4 zaes5 zaes6 zaes7 zaes8 zaes9 zaes10 zaes11 zaes12 ///
-	using "${tables}/Table_folklore_zaes_natureonly.tex", ///
+	using "${tables}/Table_folklore_zaes_natureonly_2wcluster.tex", ///
 	keep(sh_nat_socl_atl sh_nat_scl_atl sh_nat_ocl_atl) ///
 	coeflabels( ///
 		sh_nat_socl_atl "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}" ///
@@ -271,7 +165,7 @@ esttab zaes1 zaes2 zaes3 zaes4 zaes5 zaes6 zaes7 zaes8 zaes9 zaes10 zaes11 zaes1
 	booktabs b(3) replace ///
 	prehead(`"\begin{tabular}[t]{l*{12}{c}}"' ///
 			`"\toprule"' ///
-			`" & \multicolumn{12}{c}{Environmental Measures (ZAES) - Nature Exclusive} \\"' ///
+			`" & \multicolumn{12}{c}{Environmental Measures (ZAES) - Nature Exclusive (2-way clustered SEs)} \\"' ///
 			`"\cmidrule(lr){2-13}"' ///
 			`" & (1) & (2) & (3) & (4) & (5) & (6) & (7) & (8) & (9) & (10) & (11) & (12) \\"' ///
 			`"\midrule"') ///
@@ -285,12 +179,12 @@ esttab zaes1 zaes2 zaes3 zaes4 zaes5 zaes6 zaes7 zaes8 zaes9 zaes10 zaes11 zaes1
 			 `" & & & & & & & & & & & & \\"' ///
 			 `"Observations & ${n1} & ${n2} & ${n3} & ${n4} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n10} & ${n11} & ${n12} \\"' ///
 			 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my4} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my10} & ${my11} & ${my12} \\"' ///
-			 `"Ethnic-folklore clusters & ${cl1} & ${cl2} & ${cl3} & ${cl4} & ${cl5} & ${cl6} & ${cl7} & ${cl8} & ${cl9} & ${cl10} & ${cl11} & ${cl12} \\"' ///
+			 `"Ethnic-folklore clusters & ${clf1} & ${clf2} & ${clf3} & ${clf4} & ${clf5} & ${clf6} & ${clf7} & ${clf8} & ${clf9} & ${clf10} & ${clf11} & ${clf12} \\"' ///
+			 `"Country clusters & ${clc1} & ${clc2} & ${clc3} & ${clc4} & ${clc5} & ${clc6} & ${clc7} & ${clc8} & ${clc9} & ${clc10} & ${clc11} & ${clc12} \\"' ///
 			 `"\bottomrule"' ///
 			 `"\end{tabular}"')
 
-di _n "Replication completed successfully!"
-
+di _n "Z-AES with 2-way clustered SEs — table completed!"
 
 
 *END

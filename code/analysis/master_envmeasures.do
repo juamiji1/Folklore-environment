@@ -1,5 +1,5 @@
 /*------------------------------------------------------------------------------
-PROJECT: Folklore-environment (Nathan Project)
+PROJECT: Folklore-environment
 AUTHOR:  JMJR
 TOPIC:   Master do-file — sets globals and runs create_data + regressions
 DATE:
@@ -46,12 +46,24 @@ capture grstyle color background white
 capture grstyle color major_grid dimgray
 
 *-------------------------------------------------------------------------------
-* Data preparation
+* 1. Data preparation
 *-------------------------------------------------------------------------------
 do "${code}/create_folklore_envmeasures.do"
 
 *-------------------------------------------------------------------------------
-* Regressions
+* 2-5. AES / ZAES regressions (combined outcomes)
 *-------------------------------------------------------------------------------
-do "${code}/regressions_envmeasures_aes_natureonly_replication.do"
+do "${code}/regressions_envmeasures_aes_natureonly.do"
+do "${code}/regressions_envmeasures_aes_natureonly_2wayclusters_ethnic.do"
+do "${code}/regressions_envmeasures_aes_natureonly_2wayclusters_lingui.do"
+do "${code}/regressions_envmeasures_aes_natureonly_conley500km.do"
+
+*-------------------------------------------------------------------------------
+* 6-9. Per-outcome regressions
+*-------------------------------------------------------------------------------
 do "${code}/regressions_envmeasures_peroutcome_natureonly.do"
+do "${code}/regressions_envmeasures_peroutcome_natureonly_2wayclusters_ethnic.do"
+do "${code}/regressions_envmeasures_peroutcome_natureonly_2wayclusters_lingui.do"
+do "${code}/regressions_envmeasures_peroutcome_natureonly_conley500km.do"
+
+di _n "Master pipeline finished."

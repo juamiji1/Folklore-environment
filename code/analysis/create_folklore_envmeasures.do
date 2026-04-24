@@ -140,6 +140,17 @@ gen tot_water=permwater_km2+losswater_km2
 gen sh_losswater=losswater_km2*100/permwater_km2
 replace sh_losswater=0 if sh_losswater==.
 
+*gen sh_permwater_base=permwater_baseline_km2*100/area_km2
+gen sh_permwater_base=permwater_2000_km2*100/area_km2
+gen sh_seasonwater_base=seasonalwater_2000_km2*100/area_km2
+
+gen water_2000_km2=permwater_2000_km2+seasonalwater_2000_km2
+gen sh_water_base=water_2000_km2*100/area_km2
+
+* Same shares but excluding pixels inside non-natural lakes (Lake_type 2 or 3)
+gen sh_permwater_base_excl_res   = permwater_2000_km2_excl_res*100/area_km2
+gen sh_seasonwater_base_excl_res = seasonalwater_2000_km2_excl_res*100/area_km2
+
 replace ghg=0 if ghg==.
 
 gen sh_permwater=permwater_km2*100/area_km2
@@ -181,15 +192,21 @@ ds share_gc_*
 local climvars `r(varlist)'
 
 * Keep essential variables for replication
+* Note: `changewater*` wildcard already covers changewater, changewater_abs,
+* and their _excl_res counterparts (anything starting with "changewater").
 keep id c1 isocode country_code isocode_num eafolk_id ///
-     bii sh_treecover* changewater hii ///
+     bii sh_treecover* changewater* hii ///
      sh_nat_socl_atl sh_nat_scl_atl sh_nat_ocl_atl ///
      `climvars' dom_climzone tri_mean elev_mean lat lon ///
-     area_km2 sh_protected sh_treeloss*
+     area_km2 sh_protected sh_treeloss* ///
+     sh_permwater_base sh_permwater_base_excl_res ///
+     sh_seasonwater_base sh_seasonwater_base_excl_res ///
+	 sh_water_base v98
 
 * Order variables
 order id c1 isocode country_code isocode_num eafolk_id ///
-      bii sh_treecover* changewater hii ///
+      bii sh_treecover* changewater changewater_excl_res ///
+      changewater_abs changewater_abs_excl_res hii ///
       sh_nat_socl_atl sh_nat_scl_atl sh_nat_ocl_atl
 
 *-------------------------------------------------------------------------------

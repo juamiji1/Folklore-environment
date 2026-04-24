@@ -1,19 +1,20 @@
 /*------------------------------------------------------------------------------
-PROJECT: 
+PROJECT:
 AUTHOR: JMJR
-TOPIC: Regressions per outcome with Nature Exclusive Measures (REPLICATION)
-       — table style aligned with regressions_envmeasures_aes_natureonly_NEW.do
+TOPIC: Per-outcome regressions with Nature Exclusive Measures (REPLICATION)
+       — 2-way clustered SEs (v98 + country_code)
 DATE:
 
-NOTES: Same per-outcome design as regressions_envmeasures_peroutcome_natureonly.do
-       (one table per outcome, treatment alternates between X1_int and X2_int),
-       but with the table modifications adopted from the AES_NEW file:
-         * 12 columns from a single forval c=1/6 loop (k = c + 6 for the
-           X2_int half), no separate X3e slot
-         * X1..X6 spec ladder (X1: country FE → X6: + sh_protected)
-         * Footer rows added for Mean of dep. var., Standard deviation of
-           dep. var., and Ethnic-folklore clusters
-         * ${IF} and ${CL} globals to slim the regression call
+NOTES: Mirrors regressions_envmeasures_peroutcome_natureonly_NEW_2wayclusters.do
+       but the two-way cluster is (v98, country_code) instead of
+       (eafolk_id, country_code) via reghdfe.
+
+       Output filenames append `_2wcluster_v98` so this can run alongside the
+       eafolk_id-based 2-way file without overwriting its outputs.
+
+       Requires: ssc install reghdfe ; ssc install ftools
+       Requires: v98 to be present in folklore_envmeasures.dta — if missing,
+       add `v98` to the keep list in create_folklore_envmeasures.do.
 ------------------------------------------------------------------------------*/
 
 clear all
@@ -74,7 +75,7 @@ gl X5 "hii elev_mean tri_mean ${domclimezone} ${countrycodes}"
 gl X6 "hii elev_mean tri_mean sh_protected ${domclimezone} ${countrycodes}"
 
 gl IF "missing_values==0"
-gl CL "eafolk_id"
+gl CL "v98 country_code"
 
 *-------------------------------------------------------------------------------
 * Outcome labels (used in the table title)
@@ -90,12 +91,10 @@ la var sh_permwater_base   "Permanent Surface Water"
 la var sh_seasonwater_base "Seasonal Surface Water"
 
 *-------------------------------------------------------------------------------
-* Estimations + tables — one per outcome, 12 columns each
+* Estimations + tables — one per outcome, 12 columns each, 2-way clustered SEs
 *   Cols 1..6  : (X1..X6) x X1_int
 *   Cols 7..12 : (X1..X6) x X2_int  (k = c + 6, same controls as col c)
 *-------------------------------------------------------------------------------
-*gl depvars "bii sh_treecover sh_treecover_modis sh_treeloss changewater changewater_abs sh_permwater_base sh_seasonwater_base sh_permwater_base_excl_res sh_seasonwater_base_excl_res changewater_excl_res changewater_abs_excl_res sh_water_base"
-
 gl depvars "bii sh_treecover sh_seasonwater_base"
 
 foreach yvar of global depvars {
@@ -112,17 +111,16 @@ foreach yvar of global depvars {
 		** First spec (X1_int) — column `c'
 		cap drop missing_values
 		egen missing_values = rowmiss(`yvar' ${X`c'} ${X1_int})
-		
+
 		cap drop std_`yvar'
-		egen std_`yvar'= std(`yvar') if ${IF}
-		
-		* Estimation
-		eststo c`c': reg std_`yvar' ${X`c'} ${X1_int} if ${IF}, vce(cluster ${CL}) 
-		gl n`c'  = `e(N)'
-		
-		distinct eafolk_id if e(sample)==1
-		gl cl`c' = "`r(ndistinct)'"
-		
+		egen std_`yvar' = std(`yvar') if ${IF}
+
+		* Estimation — reghdfe with 2-way clustered SEs (v98 + country)
+		eststo c`c': reghdfe std_`yvar' ${X`c'} ${X1_int} if ${IF}, noabsorb vce(cluster ${CL}) keepsing
+		gl n`c'   = `e(N)'
+		gl clf`c' = "`e(N_clust1)'"
+		gl clc`c' = "`e(N_clust2)'"
+
 		sum `yvar' if e(sample)==1
 		gl my`c' = string(r(mean), "%9.3f")
 		gl sd`c' = string(r(sd),   "%9.3f")
@@ -130,17 +128,16 @@ foreach yvar of global depvars {
 		** Second spec (X2_int) — column `k' = `c' + 6, same controls X`c'
 		cap drop missing_values
 		egen missing_values = rowmiss(`yvar' ${X`c'} ${X2_int})
-		
+
 		cap drop std_`yvar'
-		egen std_`yvar'= std(`yvar') if ${IF}
-		
-		* Estimation
-		eststo c`k': reg std_`yvar' ${X`c'} ${X2_int} if ${IF}, vce(cluster ${CL}) 
-		gl n`k'  = `e(N)'
-		
-		distinct eafolk_id if e(sample)==1
-		gl cl`k' = "`r(ndistinct)'"
-		
+		egen std_`yvar' = std(`yvar') if ${IF}
+
+		* Estimation — reghdfe with 2-way clustered SEs (v98 + country)
+		eststo c`k': reghdfe std_`yvar' ${X`c'} ${X2_int} if ${IF}, noabsorb vce(cluster ${CL}) keepsing
+		gl n`k'   = `e(N)'
+		gl clf`k' = "`e(N_clust1)'"
+		gl clc`k' = "`e(N_clust2)'"
+
 		sum `yvar' if e(sample)==1
 		gl my`k' = string(r(mean), "%9.3f")
 		gl sd`k' = string(r(sd),   "%9.3f")
@@ -150,7 +147,7 @@ foreach yvar of global depvars {
 	* Export
 	*-------------------------------------------------------------------------------
 	esttab c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 ///
-		using "${tables}/Table_peroutcome_`yvar'.tex", ///
+		using "${tables}/Table_peroutcome_`yvar'_2wcluster_v98.tex", ///
 		keep(${X1_int} ${X2_int}) ///
 		coeflabels( ///
 			sh_nat_socl_atl "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}" ///
@@ -161,7 +158,7 @@ foreach yvar of global depvars {
 		booktabs b(3) replace ///
 		prehead(`"\begin{tabular}[t]{l*{12}{c}}"' ///
 				`"\toprule"' ///
-				`" & \multicolumn{12}{c}{`ylab' - Nature Exclusive} \\"' ///
+				`" & \multicolumn{12}{c}{`ylab' - Nature Exclusive (2-way clustered SEs: v98 + country)} \\"' ///
 				`"\cmidrule(lr){2-13}"' ///
 				`" & (1) & (2) & (3) & (4) & (5) & (6) & (7) & (8) & (9) & (10) & (11) & (12) \\"' ///
 				`"\midrule"') ///
@@ -175,12 +172,13 @@ foreach yvar of global depvars {
 				 `" & & & & & & & & & & & & \\"' ///
 				 `"Observations & ${n1} & ${n2} & ${n3} & ${n4} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n10} & ${n11} & ${n12} \\"' ///
 				 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my4} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my10} & ${my11} & ${my12} \\"' ///
-				 `"Ethnic-folklore clusters & ${cl1} & ${cl2} & ${cl3} & ${cl4} & ${cl5} & ${cl6} & ${cl7} & ${cl8} & ${cl9} & ${cl10} & ${cl11} & ${cl12} \\"' ///
+				 `"Linguistic clusters & ${clf1} & ${clf2} & ${clf3} & ${clf4} & ${clf5} & ${clf6} & ${clf7} & ${clf8} & ${clf9} & ${clf10} & ${clf11} & ${clf12} \\"' ///
+				 `"Country clusters & ${clc1} & ${clc2} & ${clc3} & ${clc4} & ${clc5} & ${clc6} & ${clc7} & ${clc8} & ${clc9} & ${clc10} & ${clc11} & ${clc12} \\"' ///
 				 `"\bottomrule"' ///
 				 `"\end{tabular}"')
 }
 
-di _n "Per-outcome tables completed!"
+di _n "Per-outcome tables (2-way clustered SEs: v98 + country) completed!"
 
 
 *END
