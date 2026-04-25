@@ -73,7 +73,7 @@ gl X4 "hii elev_mean ${domclimezone} ${countrycodes}"
 gl X5 "hii elev_mean tri_mean ${domclimezone} ${countrycodes}"
 gl X6 "hii elev_mean tri_mean sh_protected ${domclimezone} ${countrycodes}"
 
-gl IF "missing_values==0"
+gl IF "hii!=. & missing_values==0"
 gl CL "eafolk_id"
 
 *-------------------------------------------------------------------------------

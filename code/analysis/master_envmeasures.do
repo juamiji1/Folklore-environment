@@ -54,6 +54,7 @@ do "${code}/create_folklore_envmeasures.do"
 * 2-5. AES / ZAES regressions (combined outcomes)
 *-------------------------------------------------------------------------------
 do "${code}/regressions_envmeasures_aes_natureonly.do"
+do "${code}/regressions_envmeasures_aes_natureonly_1waycluster_lingui.do"
 do "${code}/regressions_envmeasures_aes_natureonly_2wayclusters_ethnic.do"
 do "${code}/regressions_envmeasures_aes_natureonly_2wayclusters_lingui.do"
 do "${code}/regressions_envmeasures_aes_natureonly_conley500km.do"
@@ -62,8 +63,13 @@ do "${code}/regressions_envmeasures_aes_natureonly_conley500km.do"
 * 6-9. Per-outcome regressions
 *-------------------------------------------------------------------------------
 do "${code}/regressions_envmeasures_peroutcome_natureonly.do"
+do "${code}/regressions_envmeasures_peroutcome_natureonly_1waycluster_lingui.do"
 do "${code}/regressions_envmeasures_peroutcome_natureonly_2wayclusters_ethnic.do"
 do "${code}/regressions_envmeasures_peroutcome_natureonly_2wayclusters_lingui.do"
 do "${code}/regressions_envmeasures_peroutcome_natureonly_conley500km.do"
+
+
+
+do "${code}/regressions_envmeasures_peroutcome_natureonly_treecover_comparison.do"
 
 di _n "Master pipeline finished."
