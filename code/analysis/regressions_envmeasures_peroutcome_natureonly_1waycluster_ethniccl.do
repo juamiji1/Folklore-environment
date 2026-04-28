@@ -120,7 +120,7 @@ foreach yvar of global depvars {
 		eststo c`c': reg std_`yvar' ${X`c'} ${X1_int} if ${IF}, vce(cluster ${CL}) 
 		gl n`c'  = `e(N)'
 		
-		distinct v98 if e(sample)==1
+		distinct ${CL} if e(sample)==1
 		gl cl`c' = "`r(ndistinct)'"
 		
 		sum `yvar' if e(sample)==1
@@ -138,7 +138,7 @@ foreach yvar of global depvars {
 		eststo c`k': reg std_`yvar' ${X`c'} ${X2_int} if ${IF}, vce(cluster ${CL}) 
 		gl n`k'  = `e(N)'
 		
-		distinct v98 if e(sample)==1
+		distinct ${CL} if e(sample)==1
 		gl cl`k' = "`r(ndistinct)'"
 		
 		sum `yvar' if e(sample)==1
@@ -175,7 +175,7 @@ foreach yvar of global depvars {
 				 `" & & & & & & & & & & & & \\"' ///
 				 `"Observations & ${n1} & ${n2} & ${n3} & ${n4} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n10} & ${n11} & ${n12} \\"' ///
 				 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my4} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my10} & ${my11} & ${my12} \\"' ///
-				 `"Linguistic clusters & ${cl1} & ${cl2} & ${cl3} & ${cl4} & ${cl5} & ${cl6} & ${cl7} & ${cl8} & ${cl9} & ${cl10} & ${cl11} & ${cl12} \\"' ///
+				 `"Cultural clusters & ${cl1} & ${cl2} & ${cl3} & ${cl4} & ${cl5} & ${cl6} & ${cl7} & ${cl8} & ${cl9} & ${cl10} & ${cl11} & ${cl12} \\"' ///
 				 `"\bottomrule"' ///
 				 `"\end{tabular}"')
 }

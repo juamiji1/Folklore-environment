@@ -45,7 +45,7 @@ capture grstyle title color black
 capture grstyle color background white
 capture grstyle color major_grid dimgray
 
-/*-------------------------------------------------------------------------------
+*-------------------------------------------------------------------------------
 * 1. Data preparation
 *-------------------------------------------------------------------------------
 do "${code}/create_folklore_envmeasures.do"
@@ -55,18 +55,25 @@ do "${code}/create_folklore_envmeasures.do"
 *-------------------------------------------------------------------------------
 do "${code}/regressions_envmeasures_aes_natureonly.do"
 do "${code}/regressions_envmeasures_aes_natureonly_1waycluster_lingui.do"
+do "${code}/regressions_envmeasures_aes_natureonly_1waycluster_ethniccl.do"
 do "${code}/regressions_envmeasures_aes_natureonly_2wayclusters_ethnic.do"
 do "${code}/regressions_envmeasures_aes_natureonly_2wayclusters_lingui.do"
+do "${code}/regressions_envmeasures_aes_natureonly_2wayclusters_ethniccl.do"
 do "${code}/regressions_envmeasures_aes_natureonly_conley500km.do"
+do "${code}/regressions_envmeasures_aes_natureonly_dfits.do"
+do "${code}/regressions_envmeasures_aes_natureonly_frac.do"
 
 *-------------------------------------------------------------------------------
 * 6-9. Per-outcome regressions
 *-------------------------------------------------------------------------------
 do "${code}/regressions_envmeasures_peroutcome_natureonly.do"
 do "${code}/regressions_envmeasures_peroutcome_natureonly_1waycluster_lingui.do"
+do "${code}/regressions_envmeasures_peroutcome_natureonly_1waycluster_ethniccl.do"
 do "${code}/regressions_envmeasures_peroutcome_natureonly_2wayclusters_ethnic.do"
 do "${code}/regressions_envmeasures_peroutcome_natureonly_2wayclusters_lingui.do"
-do "${code}/regressions_envmeasures_peroutcome_natureonly_conley500km.do"
+do "${code}/regressions_envmeasures_peroutcome_natureonly_2wayclusters_ethniccl.do"
+do "${code}/regressions_envmeasures_peroutcome_natureonly_dfits.do"
+do "${code}/regressions_envmeasures_peroutcome_natureonly_frac.do"
 
 
 

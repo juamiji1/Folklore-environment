@@ -2,31 +2,19 @@
 PROJECT:
 AUTHOR: JMJR
 TOPIC: Per-outcome regressions with Nature Exclusive Measures (REPLICATION)
-       — Country-level ethnolinguistic fractionalization filter
+       — 2-way clustered SEs (v98 + country_code)
 DATE:
 
-NOTES: Mirrors regressions_envmeasures_peroutcome_natureonly.do (one table
-       per outcome, treatment alternates between X1_int and X2_int, 12
-       columns from a single forval c=1/6 loop with k = c + 6) but
-       additionally drops countries with low ethnolinguistic
-       fractionalization so the within-country FE identification rests on
-       countries with meaningful polygon variation.
+NOTES: Mirrors regressions_envmeasures_peroutcome_natureonly_NEW_2wayclusters.do
+       but the two-way cluster is (v98, country_code) instead of
+       (eafolk_id, country_code) via reghdfe.
 
-       Fractionalization (Easterly & Levine 1997, Alesina et al. 2003 style):
+       Output filenames append `_2wcluster_v98` so this can run alongside the
+       eafolk_id-based 2-way file without overwriting its outputs.
 
-           share_i,c = area_km2_i / Σ area_km2 within country c
-           HHI_c     = Σ_i share_i,c²
-           frac_c    = 1 - HHI_c
-
-           = probability that two random pieces of country c's land fall in
-             different Ethnologue polygons.
-
-       frac_c >= 0.5 corresponds to ≥ 2 "effective" equal-sized polygons.
-
-       Output filenames append `_frac` to avoid overwriting the baseline.
-
-       Requires: area_km2 in folklore_envmeasures.dta
-       Requires: ssc install estout
+       Requires: ssc install reghdfe ; ssc install ftools
+       Requires: v98 to be present in folklore_envmeasures.dta — if missing,
+       add `v98` to the keep list in create_folklore_envmeasures.do.
 ------------------------------------------------------------------------------*/
 
 clear all
@@ -60,25 +48,6 @@ grstyle color major_grid dimgray
 use "${data}/final/folklore_envmeasures.dta", clear
 
 *-------------------------------------------------------------------------------
-* Country-level ethnolinguistic fractionalization
-*   share_i,c = area_km2_i / Σ area_km2 within country c
-*   HHI_c     = Σ_i share_i,c²
-*   frac_c    = 1 - HHI_c
-*-------------------------------------------------------------------------------
-cap drop tot_area_country share_country hhi_country frac_country keep_country
-
-bysort country_code: egen tot_area_country = total(area_km2)
-gen share_country = area_km2 / tot_area_country
-
-bysort country_code: egen hhi_country = total(share_country^2)
-gen frac_country = 1 - hhi_country
-
-gen byte keep_country = frac_country >= 0.5
-
-
-drop tot_area_country share_country hhi_country
-
-*-------------------------------------------------------------------------------
 * Create country & climatic-zone fixed-effects dummies
 *-------------------------------------------------------------------------------
 cap drop country_code_*
@@ -105,9 +74,8 @@ gl X4 "hii elev_mean ${domclimezone} ${countrycodes}"
 gl X5 "hii elev_mean tri_mean ${domclimezone} ${countrycodes}"
 gl X6 "hii elev_mean tri_mean sh_protected ${domclimezone} ${countrycodes}"
 
-* Note: keep_country == 1 enforces the fractionalization filter on every regression.
-gl IF "hii!=. & missing_values==0 & keep_country == 1"
-gl CL "eafolk_id"
+gl IF "hii!=. & missing_values==0"
+gl CL "v114 country_code"
 
 *-------------------------------------------------------------------------------
 * Outcome labels (used in the table title)
@@ -123,7 +91,7 @@ la var sh_permwater_base   "Permanent Surface Water"
 la var sh_seasonwater_base "Seasonal Surface Water"
 
 *-------------------------------------------------------------------------------
-* Estimations + tables — one per outcome, 12 columns each
+* Estimations + tables — one per outcome, 12 columns each, 2-way clustered SEs
 *   Cols 1..6  : (X1..X6) x X1_int
 *   Cols 7..12 : (X1..X6) x X2_int  (k = c + 6, same controls as col c)
 *-------------------------------------------------------------------------------
@@ -147,12 +115,11 @@ foreach yvar of global depvars {
 		cap drop std_`yvar'
 		egen std_`yvar' = std(`yvar') if ${IF}
 
-		* Estimation
-		eststo c`c': reg std_`yvar' ${X`c'} ${X1_int} if ${IF}, vce(cluster ${CL})
-		gl n`c'  = `e(N)'
-
-		distinct eafolk_id if e(sample)==1
-		gl cl`c' = "`r(ndistinct)'"
+		* Estimation — reghdfe with 2-way clustered SEs (v98 + country)
+		eststo c`c': reghdfe std_`yvar' ${X`c'} ${X1_int} if ${IF}, noabsorb vce(cluster ${CL}) keepsing
+		gl n`c'   = `e(N)'
+		gl clf`c' = "`e(N_clust1)'"
+		gl clc`c' = "`e(N_clust2)'"
 
 		sum `yvar' if e(sample)==1
 		gl my`c' = string(r(mean), "%9.3f")
@@ -165,12 +132,11 @@ foreach yvar of global depvars {
 		cap drop std_`yvar'
 		egen std_`yvar' = std(`yvar') if ${IF}
 
-		* Estimation
-		eststo c`k': reg std_`yvar' ${X`c'} ${X2_int} if ${IF}, vce(cluster ${CL})
-		gl n`k'  = `e(N)'
-
-		distinct eafolk_id if e(sample)==1
-		gl cl`k' = "`r(ndistinct)'"
+		* Estimation — reghdfe with 2-way clustered SEs (v98 + country)
+		eststo c`k': reghdfe std_`yvar' ${X`c'} ${X2_int} if ${IF}, noabsorb vce(cluster ${CL}) keepsing
+		gl n`k'   = `e(N)'
+		gl clf`k' = "`e(N_clust1)'"
+		gl clc`k' = "`e(N_clust2)'"
 
 		sum `yvar' if e(sample)==1
 		gl my`k' = string(r(mean), "%9.3f")
@@ -181,7 +147,7 @@ foreach yvar of global depvars {
 	* Export
 	*-------------------------------------------------------------------------------
 	esttab c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 ///
-		using "${tables}/Table_peroutcome_`yvar'_frac.tex", ///
+		using "${tables}/Table_peroutcome_`yvar'_2wcluster_v114.tex", ///
 		keep(${X1_int} ${X2_int}) ///
 		coeflabels( ///
 			sh_nat_socl_atl "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}" ///
@@ -192,7 +158,7 @@ foreach yvar of global depvars {
 		booktabs b(3) replace ///
 		prehead(`"\begin{tabular}[t]{l*{12}{c}}"' ///
 				`"\toprule"' ///
-				`" & \multicolumn{12}{c}{`ylab' - Nature Exclusive (frac $\geq$ 0.5)} \\"' ///
+				`" & \multicolumn{12}{c}{`ylab' - Nature Exclusive (2-way clustered SEs: v98 + country)} \\"' ///
 				`"\cmidrule(lr){2-13}"' ///
 				`" & (1) & (2) & (3) & (4) & (5) & (6) & (7) & (8) & (9) & (10) & (11) & (12) \\"' ///
 				`"\midrule"') ///
@@ -206,12 +172,13 @@ foreach yvar of global depvars {
 				 `" & & & & & & & & & & & & \\"' ///
 				 `"Observations & ${n1} & ${n2} & ${n3} & ${n4} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n10} & ${n11} & ${n12} \\"' ///
 				 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my4} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my10} & ${my11} & ${my12} \\"' ///
-				 `"Ethnic-folklore clusters & ${cl1} & ${cl2} & ${cl3} & ${cl4} & ${cl5} & ${cl6} & ${cl7} & ${cl8} & ${cl9} & ${cl10} & ${cl11} & ${cl12} \\"' ///
+				 `"Cultural clusters & ${clf1} & ${clf2} & ${clf3} & ${clf4} & ${clf5} & ${clf6} & ${clf7} & ${clf8} & ${clf9} & ${clf10} & ${clf11} & ${clf12} \\"' ///
+				 `"Country clusters & ${clc1} & ${clc2} & ${clc3} & ${clc4} & ${clc5} & ${clc6} & ${clc7} & ${clc8} & ${clc9} & ${clc10} & ${clc11} & ${clc12} \\"' ///
 				 `"\bottomrule"' ///
 				 `"\end{tabular}"')
 }
 
-di _n "Per-outcome (frac >= 0.5) tables completed!"
+di _n "Per-outcome tables (2-way clustered SEs: v98 + country) completed!"
 
 
 *END
