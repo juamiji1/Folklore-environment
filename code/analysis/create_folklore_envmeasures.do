@@ -214,7 +214,7 @@ keep id c1 isocode country_code isocode_num eafolk_id ///
      area_km2 sh_protected sh_treeloss* ///
      sh_permwater_base sh_permwater_base_excl_res ///
      sh_seasonwater_base sh_seasonwater_base_excl_res ///
-	 sh_water_base v98
+	 sh_water_base v98 v114 
 
 * Order variables
 order id c1 isocode country_code isocode_num eafolk_id ///

@@ -45,7 +45,7 @@ capture grstyle title color black
 capture grstyle color background white
 capture grstyle color major_grid dimgray
 
-*-------------------------------------------------------------------------------
+/*-------------------------------------------------------------------------------
 * 1. Data preparation
 *-------------------------------------------------------------------------------
 do "${code}/create_folklore_envmeasures.do"
