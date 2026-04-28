@@ -183,8 +183,8 @@ esttab zaes1 zaes2 zaes3 zaes5 zaes6 zaes7 zaes8 zaes9 zaes11 zaes12 ///
 			 `" & & & & & & & & & & \\"' ///
 			 `"Observations & ${n1} & ${n2} & ${n3} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n11} & ${n12} \\"' ///
 			 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my11} & ${my12} \\"' ///
-			 `"Linguistic clusters & ${clf1} & ${clf2} & ${clf3} & ${clf4} & ${clf5} & ${clf6} & ${clf7} & ${clf8} & ${clf9} & ${clf10} & ${clf11} & ${clf12} \\"' ///
-			 `"Country clusters & ${clc1} & ${clc2} & ${clc3} & ${clc4} & ${clc5} & ${clc6} & ${clc7} & ${clc8} & ${clc9} & ${clc10} & ${clc11} & ${clc12} \\"' ///
+			 `"Linguistic clusters & ${clf1} & ${clf2} & ${clf3} & ${clf5} & ${clf6} & ${clf7} & ${clf8} & ${clf9} & ${clf11} & ${clf12} \\"' ///
+			 `"Country clusters & ${clc1} & ${clc2} & ${clc3} & ${clc5} & ${clc6} & ${clc7} & ${clc8} & ${clc9} & ${clc11} & ${clc12} \\"' ///
 			 `"\bottomrule"' ///
 			 `"\end{tabular}"')
 

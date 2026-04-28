@@ -175,7 +175,7 @@ foreach yvar of global depvars {
 				 `" Ruggedness + Elevation    & No  & No  & No  & Yes & Yes & No  & No  & No  & Yes & Yes \\"' ///
 				 `" Share of protected land   & No  & No  & No  & No  & Yes & No  & No  & No  & No  & Yes \\"' ///
 				 `" Country fixed effects     & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes \\"' ///
-				 `" Conley distance cutoff    & 500km & 500km & 500km & 500km & 500km & 500km & 500km & 500km & 500km & 500km & 500km & 500km \\"' ///
+				 `" Conley distance cutoff    & 500km & 500km & 500km & 500km & 500km & 500km & 500km & 500km & 500km & 500km \\"' ///
 				 `" & & & & & & & & & & \\"' ///
 				 `"Observations & ${n1} & ${n2} & ${n3} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n11} & ${n12} \\"' ///
 				 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my11} & ${my12} \\"' ///
