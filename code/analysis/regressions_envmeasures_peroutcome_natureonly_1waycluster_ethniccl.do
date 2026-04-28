@@ -149,7 +149,7 @@ foreach yvar of global depvars {
 	*-------------------------------------------------------------------------------
 	* Export
 	*-------------------------------------------------------------------------------
-	esttab c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 c11 c12 ///
+	esttab c1 c2 c3 c5 c6 c7 c8 c9 c11 c12 ///
 		using "${tables}/Table_peroutcome_`yvar'_ethniccl.tex", ///
 		keep(${X1_int} ${X2_int}) ///
 		coeflabels( ///
@@ -159,23 +159,22 @@ foreach yvar of global depvars {
 		se nocons star(* 0.10 ** 0.05 *** 0.01) ///
 		label nolines fragment nomtitle nonumbers noobs nodep collabels(none) ///
 		booktabs b(3) replace ///
-		prehead(`"\begin{tabular}[t]{l*{12}{c}}"' ///
+		prehead(`"\begin{tabular}[t]{l*{10}{c}}"' ///
 				`"\toprule"' ///
-				`" & \multicolumn{12}{c}{`ylab' - Nature Exclusive} \\"' ///
-				`"\cmidrule(lr){2-13}"' ///
-				`" & (1) & (2) & (3) & (4) & (5) & (6) & (7) & (8) & (9) & (10) & (11) & (12) \\"' ///
+				`" & \multicolumn{10}{c}{`ylab' - Nature Exclusive} \\"' ///
+				`"\cmidrule(lr){2-11}"' ///
+				`" & (1) & (2) & (3) & (4) & (5) & (6) & (7) & (8) & (9) & (10) \\"' ///
 				`"\midrule"') ///
-		postfoot(`" & & & & & & & & & & & & \\"' ///
-				 `" HII control               & No  & Yes & Yes & Yes & Yes & Yes & No  & Yes & Yes & Yes & Yes & Yes \\"' ///
-				 `" Climatic-zone FE          & No  & No  & Yes & Yes & Yes & Yes & No  & No  & Yes & Yes & Yes & Yes \\"' ///
-				 `" Elevation                 & No  & No  & No  & Yes & Yes & Yes & No  & No  & No  & Yes & Yes & Yes \\"' ///
-				 `" Ruggedness                & No  & No  & No  & No  & Yes & Yes & No  & No  & No  & No  & Yes & Yes \\"' ///
-				 `" Share of protected land   & No  & No  & No  & No  & No  & Yes & No  & No  & No  & No  & No  & Yes \\"' ///
-				 `" Country fixed effects     & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes \\"' ///
-				 `" & & & & & & & & & & & & \\"' ///
-				 `"Observations & ${n1} & ${n2} & ${n3} & ${n4} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n10} & ${n11} & ${n12} \\"' ///
-				 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my4} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my10} & ${my11} & ${my12} \\"' ///
-				 `"Cultural clusters & ${cl1} & ${cl2} & ${cl3} & ${cl4} & ${cl5} & ${cl6} & ${cl7} & ${cl8} & ${cl9} & ${cl10} & ${cl11} & ${cl12} \\"' ///
+		postfoot(`" & & & & & & & & & & \\"' ///
+				 `" HII control               & No  & Yes & Yes & Yes & Yes & No  & Yes & Yes & Yes & Yes \\"' ///
+				 `" Climatic-zone FE          & No  & No  & Yes & Yes & Yes & No  & No  & Yes & Yes & Yes \\"' ///
+				 `" Ruggedness + Elevation    & No  & No  & No  & Yes & Yes & No  & No  & No  & Yes & Yes \\"' ///
+				 `" Share of protected land   & No  & No  & No  & No  & Yes & No  & No  & No  & No  & Yes \\"' ///
+				 `" Country fixed effects     & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes \\"' ///
+				 `" & & & & & & & & & & \\"' ///
+				 `"Observations & ${n1} & ${n2} & ${n3} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n11} & ${n12} \\"' ///
+				 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my11} & ${my12} \\"' ///
+				 `"Cultural clusters & ${cl1} & ${cl2} & ${cl3} & ${cl5} & ${cl6} & ${cl7} & ${cl8} & ${cl9} & ${cl11} & ${cl12} \\"' ///
 				 `"\bottomrule"' ///
 				 `"\end{tabular}"')
 }
