@@ -8,9 +8,20 @@ This Git repo contains **only code**. Data, maps, plots, tables, deliveries, and
 
 ```
 code/
-├── build/        Python/Jupyter notebooks — build environmental measures per Ethnologue polygon
-└── analysis/     Stata .do files — regressions on folklore × environmental measures
+├── download/        Python/Jupyter notebooks — GEE export scripts that pull raster layers to Google Drive
+├── build/           Python/Jupyter notebooks — build environmental measures per Ethnologue polygon
+├── analysis/        Stata .do files — regressions on folklore × environmental measures
+└── environment.yml  conda env `geo_clean` (python 3.11, geopandas, rioxarray, rasterstats, etc.)
 ```
+
+### download/ (Python, GEE exports)
+Each notebook authenticates to Earth Engine and submits an `ee.batch.Export.image.toDrive(...)` task for one raster layer. They are asynchronous — track them at the [GEE Task Manager](https://code.earthengine.google.com/tasks), then sync the resulting `.tif` tiles from Google Drive into `Measures_work/maps/raw/<layer>/` before running anything in `build/`.
+- `forestloss_download.ipynb`, `hansen_loss_download.ipynb`, `hansen_lossyear_download.ipynb` — Hansen Global Forest Change (treecover2000, loss, lossyear)
+- `mod44b_download.ipynb` — MODIS tree cover (MOD44B)
+- `nl_download.ipynb` — VIIRS night lights
+- `waterchange_download.ipynb`, `waterchange_yearly2000_download.ipynb`, `waterchange_yearly_allyears_download.ipynb` — JRC Global Surface Water (change + yearly history)
+- `hydrolakes_download.ipynb` — HydroLAKES polygons
+- `srtm_elevation_download.ipynb`, `gmted2010_elevation_download.ipynb` — SRTM and GMTED2010 DEMs
 
 ### build/ (Python, geospatial)
 Notebooks compute zonal statistics of raster environmental layers over Ethnologue language polygons:
@@ -21,8 +32,12 @@ Notebooks compute zonal statistics of raster environmental layers over Ethnologu
 - `kgclimzones_ethnologue.ipynb` — Köppen–Geiger climate zones
 - `nl_ethnologue.ipynb` — Night lights
 - `protectedland_ethnologue.ipynb` — Protected land
-- `waterchange_ethnologue.ipynb` — Surface water change
-- `environment.yml` — conda env `geo_clean` (python 3.11, geopandas, rioxarray, rasterstats, etc.)
+- `ruggedness_ethnologue.ipynb` (SRTM) and `ruggedness_ethnologue_v2.ipynb` (GMTED2010) — elevation + Terrain Ruggedness Index
+- `treecover_modis_ethnologue.ipynb` — MODIS tree cover
+- `centroids_ethnologue.ipynb` — polygon centroids
+- `run_build.py` — orchestrator that runs the download notebooks then the `*_ethnologue.ipynb` notebooks via `conda run -n geo_clean`. GEE exports are async, so `--stage downloads` and `--stage local` must be run separately with manual Drive→local sync in between.
+
+Conda env spec lives one level up at `code/environment.yml`. Create with `conda env create -f code/environment.yml`.
 
 ### analysis/ (Stata)
 - `create_data_natureonly.do` — assembles the final regression dataset
