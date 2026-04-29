@@ -176,6 +176,94 @@ foreach yvar of global depvars {
 
 di _n "Per-outcome tables completed!"
 
+*-------------------------------------------------------------------------------
+* MODIS only
+*-------------------------------------------------------------------------------
+gl depvars "sh_treecover_modis"
+
+foreach yvar of global depvars {
+
+	local ylab : variable label `yvar'
+	if "`ylab'" == "" local ylab "`yvar'"
+
+	eststo clear
+
+	forval c=1/6 {
+
+		local k = `c' + 6
+
+		** First spec (X1_int) — column `c'
+		cap drop missing_values
+		egen missing_values = rowmiss(`yvar' ${X`c'} ${X1_int})
+		
+		cap drop std_`yvar'
+		egen std_`yvar'= std(`yvar') if ${IF}
+		
+		* Estimation
+		eststo c`c': reg std_`yvar' ${X`c'} ${X1_int} if ${IF}, vce(cluster ${CL}) 
+		gl n`c'  = `e(N)'
+		
+		distinct eafolk_id if e(sample)==1
+		gl cl`c' = "`r(ndistinct)'"
+		
+		sum `yvar' if e(sample)==1
+		gl my`c' = string(r(mean), "%9.3f")
+		gl sd`c' = string(r(sd),   "%9.3f")
+
+		** Second spec (X2_int) — column `k' = `c' + 6, same controls X`c'
+		cap drop missing_values
+		egen missing_values = rowmiss(`yvar' ${X`c'} ${X2_int})
+		
+		cap drop std_`yvar'
+		egen std_`yvar'= std(`yvar') if ${IF}
+		
+		* Estimation
+		eststo c`k': reg std_`yvar' ${X`c'} ${X2_int} if ${IF}, vce(cluster ${CL}) 
+		gl n`k'  = `e(N)'
+		
+		distinct eafolk_id if e(sample)==1
+		gl cl`k' = "`r(ndistinct)'"
+		
+		sum `yvar' if e(sample)==1
+		gl my`k' = string(r(mean), "%9.3f")
+		gl sd`k' = string(r(sd),   "%9.3f")
+	}
+
+	*-------------------------------------------------------------------------------
+	* Export
+	*-------------------------------------------------------------------------------
+	esttab c1 c2 c3 c5 c6 c7 c8 c9 c11 c12 ///
+		using "${tables}/Table_peroutcome_`yvar'.tex", ///
+		keep(${X1_int} ${X2_int}) ///
+		coeflabels( ///
+			sh_nat_socl_atl "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}" ///
+			sh_nat_scl_atl  "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject in a triplet}}" ///
+			sh_nat_ocl_atl  "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}object in a triplet}}") ///
+		se nocons star(* 0.10 ** 0.05 *** 0.01) ///
+		label nolines fragment nomtitle nonumbers noobs nodep collabels(none) ///
+		booktabs b(3) replace ///
+		prehead(`"\begin{tabular}[t]{l*{10}{c}}"' ///
+				`"\toprule"' ///
+				`" & \multicolumn{10}{c}{`ylab' - Nature Exclusive} \\"' ///
+				`"\cmidrule(lr){2-11}"' ///
+				`" & (1) & (2) & (3) & (4) & (5) & (6) & (7) & (8) & (9) & (10) \\"' ///
+				`"\midrule"') ///
+		postfoot(`" & & & & & & & & & & \\"' ///
+				 `" HII control               & No  & Yes & Yes & Yes & Yes & No  & Yes & Yes & Yes & Yes \\"' ///
+				 `" Climatic-zone FE          & No  & No  & Yes & Yes & Yes & No  & No  & Yes & Yes & Yes \\"' ///
+				 `" Ruggedness + Elevation    & No  & No  & No  & Yes & Yes & No  & No  & No  & Yes & Yes \\"' ///
+				 `" Share of protected land   & No  & No  & No  & No  & Yes & No  & No  & No  & No  & Yes \\"' ///
+				 `" Country fixed effects     & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes \\"' ///
+				 `" & & & & & & & & & & \\"' ///
+				 `"Observations & ${n1} & ${n2} & ${n3} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n11} & ${n12} \\"' ///
+				 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my11} & ${my12} \\"' ///
+				 `"Ethnic-folklore clusters & ${cl1} & ${cl2} & ${cl3} & ${cl5} & ${cl6} & ${cl7} & ${cl8} & ${cl9} & ${cl11} & ${cl12} \\"' ///
+				 `"\bottomrule"' ///
+				 `"\end{tabular}"')
+}
+
+di _n "Per-outcome tables completed!"
+
 
 *END
 

@@ -182,4 +182,12 @@ foreach yvar of global depvars {
 di _n "Per-outcome tables completed!"
 
 
+foreach yvar of global depvars {
+	hist `yvar', frac
+	gr export "${plots}/hist_`yvar'.pdf", replace as(pdf)
+	
+	hist std_`yvar', frac
+	gr export "${plots}/hist_std_`yvar'.pdf", replace as(pdf)
+}
+
 *END

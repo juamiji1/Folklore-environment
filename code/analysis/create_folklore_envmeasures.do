@@ -104,6 +104,11 @@ import delimited "${maps}/raw\Geography\ethnologue_centroids.csv", clear
 tempfile CENT
 save `CENT', replace
 
+import delimited "${maps}/raw\Water_surface\ethnologue_seasonalwater_2000_fixed.csv", clear
+
+tempfile SEAWATER
+save `SEAWATER', replace 
+
 * Merging the satellite imagery with folklore
 use "${data}/interim\Motifs_EA_WESEE_Ethnologue_humanvsnature_all.dta", clear
 
@@ -123,6 +128,10 @@ merge m:1 id using `TRIV2', keep(1 3) nogen
 merge m:1 id using `CENT', keep(1 3) nogen
 
 merge m:1 c1 using `ISO3', keep(1 3) nogen
+
+drop seasonalwater_2000_km2
+
+merge 1:1 id using `SEAWATER', keep(1 3) nogen 
 
 * Creating vars of interest 
 gen sh_protected=protected_km2*100/area_km2
