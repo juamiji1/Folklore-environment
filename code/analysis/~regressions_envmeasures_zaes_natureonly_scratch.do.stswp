@@ -260,7 +260,7 @@ esttab b1 b2 b3 b4 b5 ///
 			 "Ruggedness + Elevation    = elev_mean tri_mean" ///
 			 "Share of protected land   = sh_protected"       ///
 			 "Country fixed effects     = country_code_*")    ///
-	stats(N nclust1 nclust2 nclust3, ///
+	stats(N nclust1 nclust2 nclust3 nclust4, ///
 		  fmt(0) ///
 		  labels("Observations" ///
 				 "Ethnic groups" "Ethnic clusters" ///
