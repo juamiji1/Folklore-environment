@@ -1,27 +1,22 @@
 /*------------------------------------------------------------------------------
 PROJECT:
 AUTHOR: JMJR
-TOPIC: Scratch — ZAES with multi-cluster SEs (single coef, 4 SE rows)
+TOPIC: ZAES with multi-cluster SEs (single coef, 4 SE rows)
+       — Outcome bundle uses MODIS tree cover instead of Hansen
 DATE:
 
-NOTES: Same setup as the baseline AES file (only ZAES estimated). Each
-       coefficient is reported once and four standard errors are stacked
-       below it — one per clustering scheme — with stars derived from each
-       cluster's own p-value (not from the coefficient).
+NOTES: Mirrors regressions_envmeasures_zaes_natureonly_replication.do but
+       swaps the Hansen tree-cover share (sh_treecover) for the MODIS one
+       (sh_treecover_modis). All other outcomes, controls, and table
+       structure are identical to the baseline replication.
 
        SE bracket conventions (matches econ-paper convention):
          (se)        Folklore-ethnicity (eafolk_id)
          [se]        Ethnic clusters     (v114)
          {se}        Country             (country_code)
-         ((se))      Linguistic          (v98)
+         ((se))      Linguistic          (v114 + country_code)
 
-       Implementation: each spec is regressed once per cluster; SE and p-value
-       row vectors are attached to the spec's eststo via `estadd matrix`. The
-       table is then rendered with esttab cells(b se1 se2 se3 se4) where each
-       seN cell pulls its own bracket pair and uses its own pvalue matrix to
-       compute stars.
-
-       Output suffix `_scratch` so the table coexists with the baseline ZAES.
+       Output: Table_folklore_zaes_natureonly_modis.tex.
 ------------------------------------------------------------------------------*/
 
 clear all
@@ -99,18 +94,19 @@ la var sh_seasonwater_base "Seasonal Surface Water"
 
 *===============================================================================
 * 2. ZAES estimation — same regression with 4 clusterings stacked under each coef
+*    Outcome bundle uses MODIS tree cover (sh_treecover_modis) instead of Hansen.
 *===============================================================================
 
 * Clustering vars (order = SE row order in the table)
 *   row 1  ( )       eafolk_id     Folklore-ethnicity
 *   row 2  [ ]       v114          Ethnic clusters
 *   row 3  { }       country_code  Country
-*   row 4  < >     	 v114 + country  
+*   row 4  < >     	 v114 + country
 local clvars `""eafolk_id" "v114" "country_code" "v114 country_code""'
 local cspec_list "1 2 3 5 6"
 
-gl depvars  "bii sh_treecover sh_seasonwater_base"
-gl zdepvars "std_bii std_sh_treecover std_sh_seasonwater_base"
+gl depvars  "bii sh_treecover_modis sh_seasonwater_base"
+gl zdepvars "std_bii std_sh_treecover_modis std_sh_seasonwater_base"
 
 *-------------------------------------------------------------------------------
 * Panel A: X1_int (sh_nat_socl_atl)
@@ -214,7 +210,7 @@ local angC  = "`D'\rangle`D'"
 * Panel A — open the tabular, write Panel A header + coefficients only
 *-------------------------------------------------------------------------------
 esttab a1 a2 a3 a4 a5 ///
-	using "${tables}/Table_folklore_zaes_natureonly_scratch.tex", ///
+	using "${tables}/Table_folklore_zaes_natureonly_modis_final.tex", ///
 	keep(sh_nat_socl_atl) ///
 	varlabels( ///
 		sh_nat_socl_atl "\multirow{2}{*}{\shortstack[l]{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}", ///
@@ -228,7 +224,7 @@ esttab a1 a2 a3 a4 a5 ///
 	label collabels(none) nolines nomtitles nonumbers nodepvars noobs booktabs fragment replace ///
 	prehead(`"\begin{tabular}[t]{l*{5}{c}}"' ///
 			`"\toprule"' ///
-			`" & \multicolumn{5}{c}{Environmental Measures (AES)} \\"' ///
+			`" & \multicolumn{5}{c}{Environmental Measures (AES) - MODIS tree cover} \\"' ///
 			`"\cmidrule(lr){2-6}"' ///
 			`" & (1) & (2) & (3) & (4) & (5) \\"' ///
 			`"\midrule"' ///
@@ -241,7 +237,7 @@ esttab a1 a2 a3 a4 a5 ///
 *           obs / R² / cluster counts (stats), bottom rule + tabular close.
 *-------------------------------------------------------------------------------
 esttab b1 b2 b3 b4 b5 ///
-	using "${tables}/Table_folklore_zaes_natureonly_scratch.tex", ///
+	using "${tables}/Table_folklore_zaes_natureonly_modis_final.tex", ///
 	keep(sh_nat_scl_atl sh_nat_ocl_atl) ///
 	varlabels( ///
 		sh_nat_scl_atl "\multirow{2}{*}{\shortstack[l]{Share of motifs with at least one nature-only\\ \hspace{1em}subject in a triplet}}" ///
@@ -271,7 +267,7 @@ esttab b1 b2 b3 b4 b5 ///
 	postfoot(`"\bottomrule"' ///
 			 `"\end{tabular}"')
 
-di _n "ZAES scratch table (multi-cluster SEs via esttab) completed!"
+di _n "ZAES (MODIS tree cover) replication completed!"
 
 
 *END

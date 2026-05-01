@@ -270,7 +270,9 @@ keep id c1 isocode country_code isocode_num eafolk_id ///
      area_km2 sh_protected sh_treeloss* ///
      sh_permwater_base sh_permwater_base_excl_res ///
      sh_seasonwater_base sh_seasonwater_base_excl_res ///
-	 sh_water_base v98 v114 bii_* sh_treecover_* sh_seasonwater_*
+	 sh_water_base v98 v114 bii_* sh_treecover_* ///
+	 sh_seasonwater_* sh_nature_smotif_atleast_excl ///
+	 sh_nature_any_motif_atl sh_nature_omotif_atleast_excl 
 
 * Order variables
 order id c1 isocode country_code isocode_num eafolk_id ///

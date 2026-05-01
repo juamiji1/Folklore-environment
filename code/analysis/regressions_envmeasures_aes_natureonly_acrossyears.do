@@ -140,8 +140,8 @@ matrix colnames p_y  = "00" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "1
 * filled inside the loop, and the matrix column names become the x-axis ticks.
 
 coefplot (matrix(b_y), se(se_y) aux(p_y) ///
-          msymbol(O) msize(medium) color(black) ///
-          ciopts(lcolor(black))), ///
+          msymbol(O) msize(large) color(black) ///
+		  ciopts(lcolor(black) lwidth(thick))), ///
     vert ///
     yline(0, lcolor(gs10) lpattern(dash)) ///
     mlabcolor(black) mlabsize(vsmall) mlabpos(3) ///
@@ -217,8 +217,8 @@ foreach M in b_scl se_scl p_scl b_ocl se_ocl p_ocl {
 *===============================================================================
 
 coefplot (matrix(b_scl), se(se_scl) aux(p_scl) ///
-          msymbol(O) msize(medium) color(black) ///
-          ciopts(lcolor(black))) ///
+          msymbol(O) msize(large) color(black) ///
+          ciopts(lcolor(black) lwidth(thick))) ///
          (matrix(b_ocl), se(se_ocl) aux(p_ocl) ///
           msymbol(D) msize(medium) color(gs7) ///
           ciopts(lcolor(gs7))), ///

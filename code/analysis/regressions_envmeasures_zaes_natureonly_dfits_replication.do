@@ -1,27 +1,26 @@
 /*------------------------------------------------------------------------------
 PROJECT:
 AUTHOR: JMJR
-TOPIC: Scratch — ZAES with multi-cluster SEs (single coef, 4 SE rows)
+TOPIC: ZAES with multi-cluster SEs (single coef, 4 SE rows)
+       — Excluding influential observations via DFITS (|dfits| > 2*sqrt(k/N))
 DATE:
 
-NOTES: Same setup as the baseline AES file (only ZAES estimated). Each
-       coefficient is reported once and four standard errors are stacked
-       below it — one per clustering scheme — with stars derived from each
-       cluster's own p-value (not from the coefficient).
+NOTES: Mirrors regressions_envmeasures_zaes_natureonly_replication.do but
+       drops influential observations identified by the standard DFITS rule of
+       thumb. For each (panel, spec):
+         1. Run a plain OLS (no clustering) on aes_z to get DFITS values.
+         2. Compute cutoff = 2 * sqrt(k/N) where k = e(df_m)+1 and N = e(N).
+         3. Re-run with abs(dfits) <= cutoff, then loop over the 4 cluster
+            schemes for the SE matrix only (the sample is held fixed by the
+            DFITS filter from the diagnostic OLS).
 
        SE bracket conventions (matches econ-paper convention):
          (se)        Folklore-ethnicity (eafolk_id)
          [se]        Ethnic clusters     (v114)
          {se}        Country             (country_code)
-         ((se))      Linguistic          (v98)
+         ((se))      Linguistic          (v114 + country_code)
 
-       Implementation: each spec is regressed once per cluster; SE and p-value
-       row vectors are attached to the spec's eststo via `estadd matrix`. The
-       table is then rendered with esttab cells(b se1 se2 se3 se4) where each
-       seN cell pulls its own bracket pair and uses its own pvalue matrix to
-       compute stars.
-
-       Output suffix `_scratch` so the table coexists with the baseline ZAES.
+       Output: Table_folklore_zaes_natureonly_dfits.tex.
 ------------------------------------------------------------------------------*/
 
 clear all
@@ -99,13 +98,14 @@ la var sh_seasonwater_base "Seasonal Surface Water"
 
 *===============================================================================
 * 2. ZAES estimation — same regression with 4 clusterings stacked under each coef
+*    DFITS-trimmed sample: drop |dfits| > 2*sqrt(k/N) per (panel, spec).
 *===============================================================================
 
 * Clustering vars (order = SE row order in the table)
 *   row 1  ( )       eafolk_id     Folklore-ethnicity
 *   row 2  [ ]       v114          Ethnic clusters
 *   row 3  { }       country_code  Country
-*   row 4  < >     	 v114 + country  
+*   row 4  < >     	 v114 + country
 local clvars `""eafolk_id" "v114" "country_code" "v114 country_code""'
 local cspec_list "1 2 3 5 6"
 
@@ -129,14 +129,23 @@ forval col = 1/5 {
 	cap drop aes_z
 	egen aes_z = rowmean(${zdepvars}) if ${IF}
 
-	* Run once per cluster; first one becomes the active eststo, the others
-	* contribute SE/p-value matrices and cluster counts via estadd.
-	* foreach ... of local respects the quoted compound element "v114 country_code".
-	* reghdfe handles 1-way and 2-way clustering uniformly.
+	* Diagnostic OLS (plain) — used only to compute DFITS and the cutoff.
+	qui reg aes_z ${X`c'} ${X1_int} if ${IF}
+	cap drop dfits_a`col'
+	qui predict dfits_a`col' if e(sample), dfits
+
+	local kparm = e(df_m) + 1
+	local nobs  = e(N)
+	local cut   = 2*sqrt(`kparm'/`nobs')
+
+	* Run once per cluster on the DFITS-trimmed sample;
+	* first one becomes the active eststo, the others contribute SE/p
+	* matrices and cluster counts via estadd.
 	local i = 0
 	foreach cl of local clvars {
 		local ++i
-		qui reghdfe aes_z ${X`c'} ${X1_int} if ${IF}, noabsorb vce(cluster `cl') keepsing
+		qui reghdfe aes_z ${X`c'} ${X1_int} ///
+			if ${IF} & abs(dfits_a`col') <= `cut', noabsorb vce(cluster `cl') keepsing
 
 		matrix se`i' = r(table)["se", 1...]
 		matrix p`i'  = r(table)["pvalue", 1...]
@@ -173,10 +182,20 @@ forval col = 1/5 {
 	cap drop aes_z
 	egen aes_z = rowmean(${zdepvars}) if ${IF}
 
+	* Diagnostic OLS (plain) — used only to compute DFITS and the cutoff.
+	qui reg aes_z ${X`c'} ${X2_int} if ${IF}
+	cap drop dfits_b`col'
+	qui predict dfits_b`col' if e(sample), dfits
+
+	local kparm = e(df_m) + 1
+	local nobs  = e(N)
+	local cut   = 2*sqrt(`kparm'/`nobs')
+
 	local i = 0
 	foreach cl of local clvars {
 		local ++i
-		qui reghdfe aes_z ${X`c'} ${X2_int} if ${IF}, noabsorb vce(cluster `cl') keepsing
+		qui reghdfe aes_z ${X`c'} ${X2_int} ///
+			if ${IF} & abs(dfits_b`col') <= `cut', noabsorb vce(cluster `cl') keepsing
 
 		matrix se`i' = r(table)["se", 1...]
 		matrix p`i'  = r(table)["pvalue", 1...]
@@ -201,9 +220,6 @@ forval col = 1/5 {
 * 3. Build the table — Panel A (replace) + Panel B (append) in one tabular env
 *===============================================================================
 
-* Cell specs: each in its OWN quoted argument so esttab stacks them as rows
-* (a single quoted string would put them as columns within one row).
-*
 * SE row 4 uses LaTeX math angle brackets $\langle$ ... $\rangle$. We build the
 * dollar sign with char(36) to keep Stata from interpreting $\... as a macro.
 local D     = char(36)
@@ -214,7 +230,7 @@ local angC  = "`D'\rangle`D'"
 * Panel A — open the tabular, write Panel A header + coefficients only
 *-------------------------------------------------------------------------------
 esttab a1 a2 a3 a4 a5 ///
-	using "${tables}/Table_folklore_zaes_natureonly_scratch.tex", ///
+	using "${tables}/Table_folklore_zaes_natureonly_dfits_final.tex", ///
 	keep(sh_nat_socl_atl) ///
 	varlabels( ///
 		sh_nat_socl_atl "\multirow{2}{*}{\shortstack[l]{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}", ///
@@ -228,7 +244,7 @@ esttab a1 a2 a3 a4 a5 ///
 	label collabels(none) nolines nomtitles nonumbers nodepvars noobs booktabs fragment replace ///
 	prehead(`"\begin{tabular}[t]{l*{5}{c}}"' ///
 			`"\toprule"' ///
-			`" & \multicolumn{5}{c}{Environmental Measures (AES)} \\"' ///
+			`" & \multicolumn{5}{c}{Environmental Measures (AES) (excl. influential obs.)} \\"' ///
 			`"\cmidrule(lr){2-6}"' ///
 			`" & (1) & (2) & (3) & (4) & (5) \\"' ///
 			`"\midrule"' ///
@@ -241,7 +257,7 @@ esttab a1 a2 a3 a4 a5 ///
 *           obs / R² / cluster counts (stats), bottom rule + tabular close.
 *-------------------------------------------------------------------------------
 esttab b1 b2 b3 b4 b5 ///
-	using "${tables}/Table_folklore_zaes_natureonly_scratch.tex", ///
+	using "${tables}/Table_folklore_zaes_natureonly_dfits_final.tex", ///
 	keep(sh_nat_scl_atl sh_nat_ocl_atl) ///
 	varlabels( ///
 		sh_nat_scl_atl "\multirow{2}{*}{\shortstack[l]{Share of motifs with at least one nature-only\\ \hspace{1em}subject in a triplet}}" ///
@@ -260,7 +276,7 @@ esttab b1 b2 b3 b4 b5 ///
 			 "Ruggedness + Elevation    = elev_mean tri_mean" ///
 			 "Share of protected land   = sh_protected"       ///
 			 "Country fixed effects     = country_code_*")    ///
-	stats(N nclust1 nclust2 nclust3 nclust4, ///
+	stats(N nclust1 nclust2 nclust3, ///
 		  fmt(0) ///
 		  labels("Observations" ///
 				 "Ethnic groups" "Ethnic clusters" ///
@@ -271,7 +287,7 @@ esttab b1 b2 b3 b4 b5 ///
 	postfoot(`"\bottomrule"' ///
 			 `"\end{tabular}"')
 
-di _n "ZAES scratch table (multi-cluster SEs via esttab) completed!"
+di _n "ZAES (excl. influential obs. via DFITS) replication completed!"
 
 
 *END

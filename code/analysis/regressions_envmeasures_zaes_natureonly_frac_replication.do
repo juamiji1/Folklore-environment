@@ -1,30 +1,28 @@
 /*------------------------------------------------------------------------------
 PROJECT:
 AUTHOR: JMJR
-TOPIC: AES regressions with Nature Exclusive Measures (REPLICATION)
-       — Country-level ethnolinguistic fractionalization filter
+TOPIC: ZAES with multi-cluster SEs (single coef, 4 SE rows)
+       — Country-level ethnolinguistic fractionalization filter (frac >= 0.15)
 DATE:
 
-NOTES: Mirrors regressions_envmeasures_aes_natureonly.do (both the AES and
-       ZAES blocks) but additionally drops countries with low ethnolinguistic
-       fractionalization so the within-country FE identification rests on
-       countries with meaningful polygon variation.
-
-       Fractionalization (Easterly & Levine 1997, Alesina et al. 2003 style):
+NOTES: Mirrors regressions_envmeasures_zaes_natureonly_replication.do but
+       restricts the sample to countries with within-country area Herfindahl-
+       implied fractionalization at or above 0.15:
 
            share_i,c = area_km2_i / Σ area_km2 within country c
            HHI_c     = Σ_i share_i,c²
            frac_c    = 1 - HHI_c
 
-           = probability that two random pieces of country c's land fall in
-             different Ethnologue polygons.
+       This drops countries dominated by a single Ethnologue polygon (where
+       within-country FE identification rests on too few "effective" units).
 
-       frac_c >= 0.5 corresponds to ≥ 2 "effective" equal-sized polygons.
+       SE bracket conventions (matches econ-paper convention):
+         (se)        Folklore-ethnicity (eafolk_id)
+         [se]        Ethnic clusters     (v114)
+         {se}        Country             (country_code)
+         ((se))      Linguistic          (v114 + country_code)
 
-       Output filenames append `_frac` to avoid overwriting the baseline.
-
-       Requires: area_km2 in folklore_envmeasures.dta
-       Requires: ssc install estout
+       Output: Table_folklore_zaes_natureonly_frac.tex.
 ------------------------------------------------------------------------------*/
 
 clear all
@@ -53,7 +51,7 @@ grstyle color background white
 grstyle color major_grid dimgray
 
 *===============================================================================
-* 1. Preparing everything for estimating AES and ZAES
+* 1. Preparing everything for estimating ZAES
 *
 *===============================================================================
 use "${data}/final/folklore_envmeasures.dta", clear
@@ -77,9 +75,6 @@ gen byte keep_country =(frac_country >= 0.15)
 drop tot_area_country share_country hhi_country
 
 summ frac_country, d
-
-hist frac_country, frac
-gr export "${plots}/hist_frac_country.pdf", replace as(pdf)
 
 *-------------------------------------------------------------------------------
 * Create country & climatic-zone fixed-effects dummies
@@ -110,7 +105,6 @@ gl X6 "hii elev_mean tri_mean sh_protected ${domclimezone} ${countrycodes}"
 
 * Note: keep_country == 1 enforces the fractionalization filter on every regression.
 gl IF "hii!=. & missing_values==0 & keep_country == 1"
-gl CL "eafolk_id"
 
 *-------------------------------------------------------------------------------
 * Labels for the table title
@@ -124,22 +118,29 @@ la var sh_treeloss        "Tree Loss Share (treeloss / 2000 tree cover)"
 la var sh_permwater_base  "Permanent Surface Water"
 la var sh_seasonwater_base "Seasonal Surface Water"
 
+
 *===============================================================================
-* Z-AES results — one outcome, 12 columns
-*
+* 2. ZAES estimation — same regression with 4 clusterings stacked under each coef
 *===============================================================================
+
+* Clustering vars (order = SE row order in the table)
+*   row 1  ( )       eafolk_id     Folklore-ethnicity
+*   row 2  [ ]       v114          Ethnic clusters
+*   row 3  { }       country_code  Country
+*   row 4  < >     	 v114 + country
+local clvars `""eafolk_id" "v114" "country_code" "v114 country_code""'
+local cspec_list "1 2 3 5 6"
+
+gl depvars  "bii sh_treecover sh_seasonwater_base"
 gl zdepvars "std_bii std_sh_treecover std_sh_seasonwater_base"
 
 *-------------------------------------------------------------------------------
-* Estimations
+* Panel A: X1_int (sh_nat_socl_atl)
 *-------------------------------------------------------------------------------
 eststo clear
+forval col = 1/5 {
+	local c : word `col' of `cspec_list'
 
-forval c=1/6 {
-
-	local k=`c'+6
-
-	* First specification: aes_z ~ sh_nat_socl_atl
 	cap drop missing_values
 	egen missing_values = rowmiss(${depvars} ${X`c'} ${X1_int})
 
@@ -147,22 +148,43 @@ forval c=1/6 {
 		cap drop std_`yvar'
 		egen std_`yvar' = std(`yvar') if ${IF}
 	}
-
 	cap drop aes_z
 	egen aes_z = rowmean(${zdepvars}) if ${IF}
 
-	* Estimation of 1st spec.
-	eststo zaes`c': reg aes_z ${X`c'} ${X1_int} if ${IF}, vce(cluster ${CL})
-	gl n`c' = "`e(N)'"
+	* Run once per cluster; first one becomes the active eststo, the others
+	* contribute SE/p-value matrices and cluster counts via estadd.
+	* foreach ... of local respects the quoted compound element "v114 country_code".
+	* reghdfe handles 1-way and 2-way clustering uniformly.
+	local i = 0
+	foreach cl of local clvars {
+		local ++i
+		qui reghdfe aes_z ${X`c'} ${X1_int} if ${IF}, noabsorb vce(cluster `cl') keepsing
 
-	distinct eafolk_id if e(sample)==1
-	gl cl`c'="`r(ndistinct)'"
+		matrix se`i' = r(table)["se", 1...]
+		matrix p`i'  = r(table)["pvalue", 1...]
 
-	summ aes_z if e(sample)==1
-	gl my`c' = "`=string(round(r(mean), .001), "%9.3f")'"
-	gl sd`c' = "`=string(round(r(sd),   .001), "%9.3f")'"
+		* Cluster count = unique combinations of the cluster vars in the sample
+		tempvar clkey
+		qui egen `clkey' = group(`cl') if e(sample)
+		qui distinct `clkey' if e(sample)
+		local nc`i' = r(ndistinct)
+		drop `clkey'
 
-	* Second specification: aes_z ~ sh_nat_scl_atl + sh_nat_ocl_atl
+		if `i' == 1 {
+			eststo a`col'
+		}
+		estadd matrix se`i'     = se`i' : a`col'
+		estadd matrix p`i'      = p`i'  : a`col'
+		estadd scalar nclust`i' = `nc`i'' : a`col'
+	}
+}
+
+*-------------------------------------------------------------------------------
+* Panel B: X2_int (sh_nat_scl_atl + sh_nat_ocl_atl)
+*-------------------------------------------------------------------------------
+forval col = 1/5 {
+	local c : word `col' of `cspec_list'
+
 	cap drop missing_values
 	egen missing_values = rowmiss(${depvars} ${X`c'} ${X2_int})
 
@@ -170,55 +192,108 @@ forval c=1/6 {
 		cap drop std_`yvar'
 		egen std_`yvar' = std(`yvar') if ${IF}
 	}
-
 	cap drop aes_z
 	egen aes_z = rowmean(${zdepvars}) if ${IF}
 
-	* Estimation of 2nd spec.
-	eststo zaes`k': reg aes_z ${X`c'} ${X2_int} if ${IF}, vce(cluster ${CL})
-	gl n`k' = "`e(N)'"
+	local i = 0
+	foreach cl of local clvars {
+		local ++i
+		qui reghdfe aes_z ${X`c'} ${X2_int} if ${IF}, noabsorb vce(cluster `cl') keepsing
 
-	distinct eafolk_id if e(sample)==1
-	gl cl`k'="`r(ndistinct)'"
+		matrix se`i' = r(table)["se", 1...]
+		matrix p`i'  = r(table)["pvalue", 1...]
 
-	summ aes_z if e(sample)==1
-	gl my`k' = string(r(mean), "%9.3f")
-	gl sd`k' = string(r(sd),   "%9.3f")
+		tempvar clkey
+		qui egen `clkey' = group(`cl') if e(sample)
+		qui distinct `clkey' if e(sample)
+		local nc`i' = r(ndistinct)
+		drop `clkey'
+
+		if `i' == 1 {
+			eststo b`col'
+		}
+		estadd matrix se`i'     = se`i' : b`col'
+		estadd matrix p`i'      = p`i'  : b`col'
+		estadd scalar nclust`i' = `nc`i'' : b`col'
+	}
 }
 
+
+*===============================================================================
+* 3. Build the table — Panel A (replace) + Panel B (append) in one tabular env
+*===============================================================================
+
+* Cell specs: each in its OWN quoted argument so esttab stacks them as rows
+* (a single quoted string would put them as columns within one row).
+*
+* SE row 4 uses LaTeX math angle brackets $\langle$ ... $\rangle$. We build the
+* dollar sign with char(36) to keep Stata from interpreting $\... as a macro.
+local D     = char(36)
+local angO  = "`D'\langle`D'"
+local angC  = "`D'\rangle`D'"
+
 *-------------------------------------------------------------------------------
-* Table
+* Panel A — open the tabular, write Panel A header + coefficients only
 *-------------------------------------------------------------------------------
-esttab zaes1 zaes2 zaes3 zaes5 zaes6 zaes7 zaes8 zaes9 zaes11 zaes12 ///
-	using "${tables}/Table_folklore_zaes_natureonly_frac.tex", ///
-	keep(sh_nat_socl_atl sh_nat_scl_atl sh_nat_ocl_atl) ///
-	coeflabels( ///
-		sh_nat_socl_atl "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}" ///
-		sh_nat_scl_atl  "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject in a triplet}}" ///
-		sh_nat_ocl_atl  "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}object in a triplet}}") ///
-	se nocons star(* 0.10 ** 0.05 *** 0.01) ///
-	label nolines fragment nomtitle nonumbers noobs nodep collabels(none) ///
-	booktabs b(3) replace ///
-	prehead(`"\begin{tabular}[t]{l*{10}{c}}"' ///
+esttab a1 a2 a3 a4 a5 ///
+	using "${tables}/Table_folklore_zaes_natureonly_frac_final.tex", ///
+	keep(sh_nat_socl_atl) ///
+	varlabels( ///
+		sh_nat_socl_atl "\multirow{2}{*}{\shortstack[l]{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}", ///
+		elist(sh_nat_socl_atl "\addlinespace[1em]")) ///
+	cells(`"b(fmt(3))"' ///
+	      `"se1(par("{\footnotesize (" ")}") star pvalue(p1) fmt(3))"' ///
+	      `"se2(par("{\footnotesize [" "]}") star pvalue(p2) fmt(3))"' ///
+	      `"se3(par("{\footnotesize \{" "\}}") star pvalue(p3) fmt(3))"' ///
+	      `"se4(par("{\footnotesize `angO'" "`angC'}") star pvalue(p4) fmt(3))"') ///
+	starlevels(* 0.10 ** 0.05 *** 0.01) ///
+	label collabels(none) nolines nomtitles nonumbers nodepvars noobs booktabs fragment replace ///
+	prehead(`"\begin{tabular}[t]{l*{5}{c}}"' ///
 			`"\toprule"' ///
-			`" & \multicolumn{10}{c}{Environmental Measures (ZAES) - Nature Exclusive (frac $\geq$ 0.15)} \\"' ///
-			`"\cmidrule(lr){2-11}"' ///
-			`" & (1) & (2) & (3) & (4) & (5) & (6) & (7) & (8) & (9) & (10) \\"' ///
-			`"\midrule"') ///
-	postfoot(`" & & & & & & & & & & \\"' ///
-			 `" HII control               & No  & Yes & Yes & Yes & Yes & No  & Yes & Yes & Yes & Yes \\"' ///
-			 `" Climatic-zone FE          & No  & No  & Yes & Yes & Yes & No  & No  & Yes & Yes & Yes \\"' ///
-			 `" Ruggedness + Elevation    & No  & No  & No  & Yes & Yes & No  & No  & No  & Yes & Yes \\"' ///
-			 `" Share of protected land   & No  & No  & No  & No  & Yes & No  & No  & No  & No  & Yes \\"' ///
-			 `" Country fixed effects     & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes \\"' ///
-			 `" & & & & & & & & & & \\"' ///
-			 `"Observations & ${n1} & ${n2} & ${n3} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n11} & ${n12} \\"' ///
-			 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my11} & ${my12} \\"' ///
-			 `"Ethnic-folklore clusters & ${cl1} & ${cl2} & ${cl3} & ${cl5} & ${cl6} & ${cl7} & ${cl8} & ${cl9} & ${cl11} & ${cl12} \\"' ///
-			 `"\bottomrule"' ///
+			`" & \multicolumn{5}{c}{Environmental Measures (AES) (frac $\geq$ 0.15)} \\"' ///
+			`"\cmidrule(lr){2-6}"' ///
+			`" & (1) & (2) & (3) & (4) & (5) \\"' ///
+			`"\midrule"' ///
+			`"\addlinespace"' ///
+			`"& \multicolumn{5}{c}{\textit{Panel A. Subject or Object}} \\"' ///
+			`"\addlinespace"')
+
+*-------------------------------------------------------------------------------
+* Panel B — append Panel B header, coefficients, controls grid (indicate),
+*           obs / R² / cluster counts (stats), bottom rule + tabular close.
+*-------------------------------------------------------------------------------
+esttab b1 b2 b3 b4 b5 ///
+	using "${tables}/Table_folklore_zaes_natureonly_frac_final.tex", ///
+	keep(sh_nat_scl_atl sh_nat_ocl_atl) ///
+	varlabels( ///
+		sh_nat_scl_atl "\multirow{2}{*}{\shortstack[l]{Share of motifs with at least one nature-only\\ \hspace{1em}subject in a triplet}}" ///
+		sh_nat_ocl_atl "\multirow{2}{*}{\shortstack[l]{Share of motifs with at least one nature-only\\ \hspace{1em}object in a triplet}}", ///
+		blist(sh_nat_ocl_atl "\addlinespace[1em]") ///
+		elist(sh_nat_ocl_atl "\addlinespace[1em]")) ///
+	cells(`"b(fmt(3))"' ///
+	      `"se1(par("{\footnotesize (" ")}") star pvalue(p1) fmt(3))"' ///
+	      `"se2(par("{\footnotesize [" "]}") star pvalue(p2) fmt(3))"' ///
+	      `"se3(par("{\footnotesize \{" "\}}") star pvalue(p3) fmt(3))"' ///
+	      `"se4(par("{\footnotesize `angO'" "`angC'}") star pvalue(p4) fmt(3))"') ///
+	starlevels(* 0.10 ** 0.05 *** 0.01) ///
+	label collabels(none) nolines nomtitles nonumbers nodepvars noobs booktabs fragment append ///
+	indicate("HII control               = hii"                ///
+			 "Climatic-zone FE          = dom_climzone_*"     ///
+			 "Ruggedness + Elevation    = elev_mean tri_mean" ///
+			 "Share of protected land   = sh_protected"       ///
+			 "Country fixed effects     = country_code_*")    ///
+	stats(N nclust1 nclust2 nclust3, ///
+		  fmt(0) ///
+		  labels("Observations" ///
+				 "Ethnic groups" "Ethnic clusters" ///
+				 "Countries")) ///
+	prehead(`"& \multicolumn{5}{c}{\textit{Panel B. Subject vs Object}} \\"' ///
+			`"\addlinespace"') ///
+	prefoot(`"\addlinespace[1em]"') ///
+	postfoot(`"\bottomrule"' ///
 			 `"\end{tabular}"')
 
-di _n "ZAES (frac >= 0.5) replication completed!"
+di _n "ZAES (frac >= 0.15) replication completed!"
 
 
 *END
