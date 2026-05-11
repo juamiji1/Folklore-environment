@@ -64,7 +64,7 @@ use "${data}/final/folklore_envmeasures.dta", clear
 *   HHI_c     = Σ_i share_i,c²
 *   frac_c    = 1 - HHI_c
 *-------------------------------------------------------------------------------
-cap drop tot_area_country share_country hhi_country frac_country keep_country
+cap drop tot_area_country share_country hhi_country frac_country keep_country keep_country_top35
 
 bysort country_code: egen tot_area_country = total(area_km2)
 gen share_country = area_km2 / tot_area_country
@@ -73,6 +73,15 @@ bysort country_code: egen hhi_country = total(share_country^2)
 gen frac_country = 1 - hhi_country
 
 gen byte keep_country =(frac_country >= 0.15)
+
+* Alternative filter: drop the top 35 percent of polygons by HHI
+*   (= keep the bottom 65 percent → drop the LEAST diverse countries by HHI).
+*   Following the Easterly–Levine / Alesina convention applied to area-share
+*   HHI within country. `hhi_country' is the same value for every polygon in
+*   a given country, so the 65th-percentile cutoff is taken across the
+*   polygon-level distribution.
+_pctile hhi_country, p(65)
+gen byte keep_country_top35 = (hhi_country <= r(r1))
 
 drop tot_area_country share_country hhi_country
 
@@ -128,6 +137,7 @@ la var sh_seasonwater_base "Seasonal Surface Water"
 * Z-AES results — one outcome, 12 columns
 *
 *===============================================================================
+gl depvars "bii sh_treecover sh_seasonwater_base"
 gl zdepvars "std_bii std_sh_treecover std_sh_seasonwater_base"
 
 *-------------------------------------------------------------------------------
@@ -218,7 +228,103 @@ esttab zaes1 zaes2 zaes3 zaes5 zaes6 zaes7 zaes8 zaes9 zaes11 zaes12 ///
 			 `"\bottomrule"' ///
 			 `"\end{tabular}"')
 
-di _n "ZAES (frac >= 0.5) replication completed!"
+di _n "ZAES (frac >= 0.15) replication completed!"
+
+
+*===============================================================================
+* 2. Alternative filter — drop top 35 percent of HHI distribution
+*    (keep bottom 65 percent by HHI ⇒ drop the LEAST diverse countries)
+*===============================================================================
+
+* Swap the country-filter inside ${IF}
+gl IF "hii!=. & missing_values==0 & keep_country_top35 == 1"
+
+eststo clear
+
+forval c=1/6 {
+
+	local k=`c'+6
+
+	* First specification: aes_z ~ sh_nat_socl_atl
+	cap drop missing_values
+	egen missing_values = rowmiss(${depvars} ${X`c'} ${X1_int})
+
+	foreach yvar of global depvars {
+		cap drop std_`yvar'
+		egen std_`yvar' = std(`yvar') if ${IF}
+	}
+
+	cap drop aes_z
+	egen aes_z = rowmean(${zdepvars}) if ${IF}
+
+	* Estimation of 1st spec.
+	eststo zaes`c': reg aes_z ${X`c'} ${X1_int} if ${IF}, vce(cluster ${CL})
+	gl n`c' = "`e(N)'"
+
+	distinct eafolk_id if e(sample)==1
+	gl cl`c'="`r(ndistinct)'"
+
+	summ aes_z if e(sample)==1
+	gl my`c' = "`=string(round(r(mean), .001), "%9.3f")'"
+	gl sd`c' = "`=string(round(r(sd),   .001), "%9.3f")'"
+
+	* Second specification: aes_z ~ sh_nat_scl_atl + sh_nat_ocl_atl
+	cap drop missing_values
+	egen missing_values = rowmiss(${depvars} ${X`c'} ${X2_int})
+
+	foreach yvar of global depvars {
+		cap drop std_`yvar'
+		egen std_`yvar' = std(`yvar') if ${IF}
+	}
+
+	cap drop aes_z
+	egen aes_z = rowmean(${zdepvars}) if ${IF}
+
+	* Estimation of 2nd spec.
+	eststo zaes`k': reg aes_z ${X`c'} ${X2_int} if ${IF}, vce(cluster ${CL})
+	gl n`k' = "`e(N)'"
+
+	distinct eafolk_id if e(sample)==1
+	gl cl`k'="`r(ndistinct)'"
+
+	summ aes_z if e(sample)==1
+	gl my`k' = string(r(mean), "%9.3f")
+	gl sd`k' = string(r(sd),   "%9.3f")
+}
+
+*-------------------------------------------------------------------------------
+* Table
+*-------------------------------------------------------------------------------
+esttab zaes1 zaes2 zaes3 zaes5 zaes6 zaes7 zaes8 zaes9 zaes11 zaes12 ///
+	using "${tables}/Table_folklore_zaes_natureonly_frac_top35.tex", ///
+	keep(sh_nat_socl_atl sh_nat_scl_atl sh_nat_ocl_atl) ///
+	coeflabels( ///
+		sh_nat_socl_atl "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}" ///
+		sh_nat_scl_atl  "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}subject in a triplet}}" ///
+		sh_nat_ocl_atl  "\multirow{2}{*}{\shortstack{Share of motifs with at least one nature-only\\ \hspace{1em}object in a triplet}}") ///
+	se nocons star(* 0.10 ** 0.05 *** 0.01) ///
+	label nolines fragment nomtitle nonumbers noobs nodep collabels(none) ///
+	booktabs b(3) replace ///
+	prehead(`"\begin{tabular}[t]{l*{10}{c}}"' ///
+			`"\toprule"' ///
+			`" & \multicolumn{10}{c}{Environmental Measures (ZAES) - Nature Exclusive (drop top 35\% HHI)} \\"' ///
+			`"\cmidrule(lr){2-11}"' ///
+			`" & (1) & (2) & (3) & (4) & (5) & (6) & (7) & (8) & (9) & (10) \\"' ///
+			`"\midrule"') ///
+	postfoot(`" & & & & & & & & & & \\"' ///
+			 `" HII control               & No  & Yes & Yes & Yes & Yes & No  & Yes & Yes & Yes & Yes \\"' ///
+			 `" Climatic-zone FE          & No  & No  & Yes & Yes & Yes & No  & No  & Yes & Yes & Yes \\"' ///
+			 `" Ruggedness + Elevation    & No  & No  & No  & Yes & Yes & No  & No  & No  & Yes & Yes \\"' ///
+			 `" Share of protected land   & No  & No  & No  & No  & Yes & No  & No  & No  & No  & Yes \\"' ///
+			 `" Country fixed effects     & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes & Yes \\"' ///
+			 `" & & & & & & & & & & \\"' ///
+			 `"Observations & ${n1} & ${n2} & ${n3} & ${n5} & ${n6} & ${n7} & ${n8} & ${n9} & ${n11} & ${n12} \\"' ///
+			 `"Mean of dep. var. & ${my1} & ${my2} & ${my3} & ${my5} & ${my6} & ${my7} & ${my8} & ${my9} & ${my11} & ${my12} \\"' ///
+			 `"Ethnic-folklore clusters & ${cl1} & ${cl2} & ${cl3} & ${cl5} & ${cl6} & ${cl7} & ${cl8} & ${cl9} & ${cl11} & ${cl12} \\"' ///
+			 `"\bottomrule"' ///
+			 `"\end{tabular}"')
+
+di _n "ZAES (drop top 35% HHI) replication completed!"
 
 
 *END

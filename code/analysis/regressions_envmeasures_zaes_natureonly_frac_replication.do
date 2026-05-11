@@ -62,7 +62,7 @@ use "${data}/final/folklore_envmeasures.dta", clear
 *   HHI_c     = Σ_i share_i,c²
 *   frac_c    = 1 - HHI_c
 *-------------------------------------------------------------------------------
-cap drop tot_area_country share_country hhi_country frac_country keep_country
+cap drop tot_area_country share_country hhi_country frac_country keep_country keep_country_top35
 
 bysort country_code: egen tot_area_country = total(area_km2)
 gen share_country = area_km2 / tot_area_country
@@ -71,6 +71,13 @@ bysort country_code: egen hhi_country = total(share_country^2)
 gen frac_country = 1 - hhi_country
 
 gen byte keep_country =(frac_country >= 0.15)
+
+* Alternative filter: drop the top 35 percent of polygons by HHI
+*   (= keep the bottom 65 percent → drop the LEAST diverse countries by HHI).
+*   `hhi_country' is the same value for every polygon in a given country, so
+*   the 65th-percentile cutoff is taken across the polygon-level distribution.
+_pctile hhi_country, p(65)
+gen byte keep_country_top35 = (hhi_country <= r(r1))
 
 drop tot_area_country share_country hhi_country
 
@@ -294,6 +301,158 @@ esttab b1 b2 b3 b4 b5 ///
 			 `"\end{tabular}"')
 
 di _n "ZAES (frac >= 0.15) replication completed!"
+
+
+*===============================================================================
+* 4. Alternative filter — drop top 35 percent of HHI distribution
+*    (keep bottom 65 percent by HHI ⇒ drop the LEAST diverse countries)
+*    Same multi-cluster SE structure, separate output table.
+*===============================================================================
+
+* Swap the country-filter inside ${IF}
+gl IF "hii!=. & missing_values==0 & keep_country_top35 == 1"
+
+*-------------------------------------------------------------------------------
+* Panel A: X1_int (sh_nat_socl_atl)
+*-------------------------------------------------------------------------------
+eststo clear
+forval col = 1/5 {
+	local c : word `col' of `cspec_list'
+
+	cap drop missing_values
+	egen missing_values = rowmiss(${depvars} ${X`c'} ${X1_int})
+
+	foreach yvar of global depvars {
+		cap drop std_`yvar'
+		egen std_`yvar' = std(`yvar') if ${IF}
+	}
+	cap drop aes_z
+	egen aes_z = rowmean(${zdepvars}) if ${IF}
+
+	local i = 0
+	foreach cl of local clvars {
+		local ++i
+		qui reghdfe aes_z ${X`c'} ${X1_int} if ${IF}, noabsorb vce(cluster `cl') keepsing
+
+		matrix se`i' = r(table)["se", 1...]
+		matrix p`i'  = r(table)["pvalue", 1...]
+
+		tempvar clkey
+		qui egen `clkey' = group(`cl') if e(sample)
+		qui distinct `clkey' if e(sample)
+		local nc`i' = r(ndistinct)
+		drop `clkey'
+
+		if `i' == 1 {
+			eststo a`col'
+		}
+		estadd matrix se`i'     = se`i' : a`col'
+		estadd matrix p`i'      = p`i'  : a`col'
+		estadd scalar nclust`i' = `nc`i'' : a`col'
+	}
+}
+
+*-------------------------------------------------------------------------------
+* Panel B: X2_int (sh_nat_scl_atl + sh_nat_ocl_atl)
+*-------------------------------------------------------------------------------
+forval col = 1/5 {
+	local c : word `col' of `cspec_list'
+
+	cap drop missing_values
+	egen missing_values = rowmiss(${depvars} ${X`c'} ${X2_int})
+
+	foreach yvar of global depvars {
+		cap drop std_`yvar'
+		egen std_`yvar' = std(`yvar') if ${IF}
+	}
+	cap drop aes_z
+	egen aes_z = rowmean(${zdepvars}) if ${IF}
+
+	local i = 0
+	foreach cl of local clvars {
+		local ++i
+		qui reghdfe aes_z ${X`c'} ${X2_int} if ${IF}, noabsorb vce(cluster `cl') keepsing
+
+		matrix se`i' = r(table)["se", 1...]
+		matrix p`i'  = r(table)["pvalue", 1...]
+
+		tempvar clkey
+		qui egen `clkey' = group(`cl') if e(sample)
+		qui distinct `clkey' if e(sample)
+		local nc`i' = r(ndistinct)
+		drop `clkey'
+
+		if `i' == 1 {
+			eststo b`col'
+		}
+		estadd matrix se`i'     = se`i' : b`col'
+		estadd matrix p`i'      = p`i'  : b`col'
+		estadd scalar nclust`i' = `nc`i'' : b`col'
+	}
+}
+
+*-------------------------------------------------------------------------------
+* Panel A — open the tabular, write Panel A header + coefficients only
+*-------------------------------------------------------------------------------
+esttab a1 a2 a3 a4 a5 ///
+	using "${tables}/Table_folklore_zaes_natureonly_frac_top35_final.tex", ///
+	keep(sh_nat_socl_atl) ///
+	varlabels( ///
+		sh_nat_socl_atl "\multirow{2}{*}{\shortstack[l]{Share of motifs with at least one nature-only\\ \hspace{1em}subject or object in a triplet}}", ///
+		elist(sh_nat_socl_atl "\addlinespace[1em]")) ///
+	cells(`"b(fmt(3))"' ///
+	      `"se1(par("{\footnotesize (" ")}") star pvalue(p1) fmt(3))"' ///
+	      `"se2(par("{\footnotesize [" "]}") star pvalue(p2) fmt(3))"' ///
+	      `"se3(par("{\footnotesize \{" "\}}") star pvalue(p3) fmt(3))"' ///
+	      `"se4(par("{\footnotesize `angO'" "`angC'}") star pvalue(p4) fmt(3))"') ///
+	starlevels(* 0.10 ** 0.05 *** 0.01) ///
+	label collabels(none) nolines nomtitles nonumbers nodepvars noobs booktabs fragment replace ///
+	prehead(`"\begin{tabular}[t]{l*{5}{c}}"' ///
+			`"\toprule"' ///
+			`" & \multicolumn{5}{c}{Environmental Measures (AES) (drop top 35\% HHI)} \\"' ///
+			`"\cmidrule(lr){2-6}"' ///
+			`" & (1) & (2) & (3) & (4) & (5) \\"' ///
+			`"\midrule"' ///
+			`"\addlinespace"' ///
+			`"& \multicolumn{5}{c}{\textit{Panel A. Subject or Object}} \\"' ///
+			`"\addlinespace"')
+
+*-------------------------------------------------------------------------------
+* Panel B — append Panel B header, coefficients, controls grid (indicate),
+*           obs / R² / cluster counts (stats), bottom rule + tabular close.
+*-------------------------------------------------------------------------------
+esttab b1 b2 b3 b4 b5 ///
+	using "${tables}/Table_folklore_zaes_natureonly_frac_top35_final.tex", ///
+	keep(sh_nat_scl_atl sh_nat_ocl_atl) ///
+	varlabels( ///
+		sh_nat_scl_atl "\multirow{2}{*}{\shortstack[l]{Share of motifs with at least one nature-only\\ \hspace{1em}subject in a triplet}}" ///
+		sh_nat_ocl_atl "\multirow{2}{*}{\shortstack[l]{Share of motifs with at least one nature-only\\ \hspace{1em}object in a triplet}}", ///
+		blist(sh_nat_ocl_atl "\addlinespace[1em]") ///
+		elist(sh_nat_ocl_atl "\addlinespace[1em]")) ///
+	cells(`"b(fmt(3))"' ///
+	      `"se1(par("{\footnotesize (" ")}") star pvalue(p1) fmt(3))"' ///
+	      `"se2(par("{\footnotesize [" "]}") star pvalue(p2) fmt(3))"' ///
+	      `"se3(par("{\footnotesize \{" "\}}") star pvalue(p3) fmt(3))"' ///
+	      `"se4(par("{\footnotesize `angO'" "`angC'}") star pvalue(p4) fmt(3))"') ///
+	starlevels(* 0.10 ** 0.05 *** 0.01) ///
+	label collabels(none) nolines nomtitles nonumbers nodepvars noobs booktabs fragment append ///
+	indicate("HII control               = hii"                ///
+			 "Climatic-zone FE          = dom_climzone_*"     ///
+			 "Ruggedness + Elevation    = elev_mean tri_mean" ///
+			 "Share of protected land   = sh_protected"       ///
+			 "Country fixed effects     = country_code_*")    ///
+	stats(N nclust1 nclust2 nclust3, ///
+		  fmt(0) ///
+		  labels("Observations" ///
+				 "Ethnic groups" "Ethnic clusters" ///
+				 "Countries")) ///
+	prehead(`"& \multicolumn{5}{c}{\textit{Panel B. Subject vs Object}} \\"' ///
+			`"\addlinespace"') ///
+	prefoot(`"\addlinespace[1em]"') ///
+	postfoot(`"\bottomrule"' ///
+			 `"\end{tabular}"')
+
+di _n "ZAES (drop top 35% HHI) replication completed!"
 
 
 *END
