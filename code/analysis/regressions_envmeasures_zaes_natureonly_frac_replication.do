@@ -77,9 +77,15 @@ gen byte keep_country =(frac_country >= 0.15)
 *   `hhi_country' is the same value for every polygon in a given country, so
 *   the 65th-percentile cutoff is taken across the polygon-level distribution.
 _pctile hhi_country, p(65)
-gen byte keep_country_top35 = (hhi_country <= r(r1))
+gen byte keep_country_top35 = (hhi_country <1)
 
-drop tot_area_country share_country hhi_country
+tab keep_country_top35
+
+unique country_code
+unique country_code if keep_country_top35==0
+unique country_code if keep_country_top35==1
+
+*drop tot_area_country share_country hhi_country
 
 summ frac_country, d
 
@@ -409,7 +415,7 @@ esttab a1 a2 a3 a4 a5 ///
 	label collabels(none) nolines nomtitles nonumbers nodepvars noobs booktabs fragment replace ///
 	prehead(`"\begin{tabular}[t]{l*{5}{c}}"' ///
 			`"\toprule"' ///
-			`" & \multicolumn{5}{c}{Environmental Measures (AES) (drop top 35\% HHI)} \\"' ///
+			`" & \multicolumn{5}{c}{Environmental Measures (AES) (drop HHI = 1)} \\"' ///
 			`"\cmidrule(lr){2-6}"' ///
 			`" & (1) & (2) & (3) & (4) & (5) \\"' ///
 			`"\midrule"' ///
