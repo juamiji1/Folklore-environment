@@ -66,7 +66,7 @@ cap drop aes_z
 egen aes_z = rowmean(${zdepvars}) if ${IF}
 
 * Quick diagnostic
-summ ${zdepvars} aes_z
+summ ${zdepvars} aes_z, d
 
 *-------------------------------------------------------------------------------
 * Export to CSV for mapping

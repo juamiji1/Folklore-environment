@@ -90,7 +90,7 @@ tempfile EPAV2
 save `EPAV2', replace
 
 *Triplets from Oscar 
-import delimited "${data}/raw\ACT_measures\triplets_and_characterizations_unrolled_scores_merged.csv", varnames(1) clear
+import delimited "${data}/raw\ACT_measures\triplets_and_characterizations_unrolled_scores_merged_passive.csv", varnames(1) clear
 *import delimited "${data}/raw\triplets_and_characterizations_unrolled.csv", varnames(1) clear 
 
 *Fixing strigns to lower to match the classification
@@ -132,11 +132,6 @@ merge m:1 object using `Oclass', gen(merge_oclass)
 *Fixing ATC measures
 rename (e p a e_v2 p_v2 a_v2) (evaluation potency activity evaluation_v2 potency_v2 activity_v2)
 destring evaluation potency activity, replace force
-
-preserve
-	 keep if nature_scl==1 & human_scl==0
-	 export delimited "${data}/interim\triplets_nature_scl_only.csv", replace	 
-restore 
 
 *-------------------------------------------------------------------------------
 * Calculating total type of triplet per motif (only for SUBJECTS)
